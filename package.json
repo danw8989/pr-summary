@@ -4,7 +4,7 @@
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
   "version": "0.0.1",
   "publisher": "vscode-extensions",
-  "icon": "media/pr-summary.svg",
+  "icon": "media/pr-summary.png",
   "engines": {
     "vscode": "^1.96.2"
   },
@@ -37,24 +37,24 @@
         "command": "pr-summary.generatePrSummary",
         "title": "PR Summary: Generate PR Summary",
         "icon": {
-          "light": "media/pr-summary.svg",
-          "dark": "media/pr-summary.svg"
+          "light": "media/pr-summary.png",
+          "dark": "media/pr-summary.png"
         }
       },
       {
         "command": "pr-summary.viewHistory",
         "title": "PR Summary: View History",
         "icon": {
-          "light": "media/pr-summary.svg",
-          "dark": "media/pr-summary.svg"
+          "light": "media/pr-summary.png",
+          "dark": "media/pr-summary.png"
         }
       },
       {
         "command": "pr-summary.selectJiraTicket",
         "title": "PR Summary: Select JIRA Ticket",
         "icon": {
-          "light": "media/pr-summary.svg",
-          "dark": "media/pr-summary.svg"
+          "light": "media/pr-summary.png",
+          "dark": "media/pr-summary.png"
         }
       },
       {
@@ -67,7 +67,7 @@
         {
           "id": "pr-summary-container",
           "title": "PR Summary",
-          "icon": "media/pr-summary.svg"
+          "icon": "media/pr-summary.png"
         }
       ]
     },

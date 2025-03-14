@@ -12,37 +12,6 @@ import {
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Check if running in Cursor
-  const isCursor = vscode.env.appName.includes("Cursor");
-  console.log(
-    `PR Summary extension activating in ${vscode.env.appName} (Cursor: ${isCursor})`
-  );
-
-  // Write to filesystem for debugging
-  const fs = require("fs");
-  const path = require("path");
-  try {
-    const logPath = path.join(context.extensionPath, "activation.log");
-    fs.writeFileSync(
-      logPath,
-      `Extension activated at ${new Date().toISOString()} in ${
-        vscode.env.appName
-      }\n`,
-      { flag: "a" }
-    );
-  } catch (error) {
-    console.error("Failed to write debug log:", error);
-  }
-
-  // Force activate extension in Cursor by explicitly running a command at startup
-  if (isCursor) {
-    // Delay execution slightly to ensure UI is ready
-    setTimeout(() => {
-      console.log("Explicitly activating PR Summary extension in Cursor");
-      vscode.commands.executeCommand("pr-summary.test");
-    }, 3000);
-  }
-
   // Show a notification when the extension activates
 
   // Register Tree Data Providers for views
