@@ -2,7 +2,7 @@
   "name": "pr-summary",
   "displayName": "PR Summary",
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
