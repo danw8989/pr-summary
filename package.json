@@ -1,23 +1,88 @@
 {
   "name": "pr-summary",
   "displayName": "PR Summary",
-  "description": "",
+  "description": "Generate PR summaries using OpenAI based on your Git commit history",
   "version": "0.0.1",
+  "publisher": "vscode-extensions",
   "engines": {
     "vscode": "^1.98.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "pull request",
+    "pr",
+    "summary",
+    "openai",
+    "jira"
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "pr-summary.helloWorld",
-        "title": "Hello World"
+        "command": "pr-summary.generatePrSummary",
+        "title": "Generate PR Summary"
+      },
+      {
+        "command": "pr-summary.viewHistory",
+        "title": "View PR Summary History"
+      },
+      {
+        "command": "pr-summary.selectJiraTicket",
+        "title": "Select JIRA Ticket for PR Summary"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "PR Summary",
+      "properties": {
+        "prSummary.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API Key for generating PR summaries"
+        },
+        "prSummary.jiraUrl": {
+          "type": "string",
+          "default": "",
+          "description": "JIRA URL for ticket integration"
+        },
+        "prSummary.jiraEmail": {
+          "type": "string",
+          "default": "",
+          "description": "JIRA Email for authentication"
+        },
+        "prSummary.jiraApiToken": {
+          "type": "string",
+          "default": "",
+          "description": "JIRA API Token for authentication"
+        },
+        "prSummary.defaultModel": {
+          "type": "string",
+          "default": "o3-mini",
+          "enum": [
+            "o3-mini",
+            "o1-preview",
+            "o1-mini",
+            "gpt-4o"
+          ],
+          "description": "Default OpenAI model to use for generating PR summaries"
+        },
+        "prSummary.defaultTemplate": {
+          "type": "string",
+          "default": "Medium",
+          "enum": [
+            "Short",
+            "Medium",
+            "Long",
+            "Thorough"
+          ],
+          "description": "Default template style for PR summaries"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -29,6 +94,10 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
+  },
+  "dependencies": {
+    "openai": "^4.30.0",
+    "axios": "^1.6.7"
   },
   "devDependencies": {
     "@types/vscode": "^1.98.0",
@@ -43,5 +112,13 @@
     "webpack-cli": "^5.1.4",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/pr-summary.git"
+  },
+  "homepage": "https://github.com/yourusername/pr-summary",
+  "bugs": {
+    "url": "https://github.com/yourusername/pr-summary/issues"
   }
 }

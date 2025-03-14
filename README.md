@@ -1,71 +1,77 @@
-# pr-summary README
+# PR Summary Extension
 
-This is the README for your extension "pr-summary". After writing up a brief description, we recommend including the following sections.
+Generate comprehensive PR summaries using OpenAI's models based on your Git commit history.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **Generate PR Summaries**: Create professional PR titles and descriptions using OpenAI models
+- **Multiple Template Styles**: Choose from Short, Medium, Long, or Thorough summary styles
+- **JIRA Integration**: Link JIRA tickets to your PR summaries
+- **History Management**: View and copy your previously generated PR summaries
 
-For example if there is an image subfolder under your extension project workspace:
+## Getting Started
 
-\!\[feature X\]\(images/feature-x.png\)
+### Prerequisites
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- A valid OpenAI API key
+- Git repository with commits
+- VS Code 1.98.0 or higher
 
-## Requirements
+### Installation
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+1. Install the extension from the VS Code marketplace
+2. Configure your API keys (OpenAI and optionally JIRA)
 
-## Extension Settings
+## Usage
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+### Generate a PR Summary
 
-For example:
+1. Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on macOS)
+2. Select `Generate PR Summary`
+3. Enter your OpenAI API key (or it will use the stored one)
+4. Optionally customize the prompt, select JIRA ticket, or change other settings
+5. Click "Generate PR Summary"
+6. The extension will generate a title and description based on your Git commit history
+7. Use the "Copy" buttons to easily copy the title or description to your clipboard
 
-This extension contributes the following settings:
+### Select a JIRA Ticket
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+1. In the PR Summary generator, click "Select JIRA Ticket"
+2. Enter your JIRA credentials if not already stored
+3. Optionally filter by project
+4. Click "Load Tickets"
+5. Select a ticket from the list
+6. Click "Select Ticket" to associate it with your PR summary
 
-## Known Issues
+### View History
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+1. Open the Command Palette
+2. Select `View PR Summary History`
+3. Browse previously generated PR summaries
+4. Click any entry to view details
+5. Use the "Copy" buttons to reuse previous summaries
 
-## Release Notes
+## Configuration
 
-Users appreciate release notes as you update your extension.
+The extension stores the following settings:
 
-### 1.0.0
+- `prSummary.openaiApiKey`: Your OpenAI API key
+- `prSummary.jiraUrl`: Your JIRA URL
+- `prSummary.jiraEmail`: Your JIRA email
+- `prSummary.jiraApiToken`: Your JIRA API token
+- `prSummary.defaultModel`: Default OpenAI model to use
+- `prSummary.defaultTemplate`: Default template style
 
-Initial release of ...
+## How It Works
 
-### 1.0.1
+The extension:
 
-Fixed issue #.
+1. Gets your current branch name and commit messages
+2. Optionally includes commit diffs for more context
+3. Sends this information to OpenAI with a prompt template
+4. Parses the response into a title and description
+5. Formats the result and presents it for you to use
 
-### 1.1.0
+## License
 
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+[MIT](LICENSE)
