@@ -4,8 +4,9 @@
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
   "version": "0.0.1",
   "publisher": "vscode-extensions",
+  "icon": "media/pr-summary.svg",
   "engines": {
-    "vscode": "^1.98.0"
+    "vscode": "^1.96.2"
   },
   "categories": [
     "Other",
@@ -19,21 +20,141 @@
     "openai",
     "jira"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "*",
+    "onStartupFinished",
+    "onView:pr-summary-actions",
+    "onView:pr-summary-history",
+    "onCommand:pr-summary.generatePrSummary",
+    "onCommand:pr-summary.viewHistory",
+    "onCommand:pr-summary.selectJiraTicket",
+    "onCommand:pr-summary.test"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "pr-summary.generatePrSummary",
-        "title": "Generate PR Summary"
+        "title": "PR Summary: Generate PR Summary",
+        "icon": {
+          "light": "media/pr-summary.svg",
+          "dark": "media/pr-summary.svg"
+        }
       },
       {
         "command": "pr-summary.viewHistory",
-        "title": "View PR Summary History"
+        "title": "PR Summary: View History",
+        "icon": {
+          "light": "media/pr-summary.svg",
+          "dark": "media/pr-summary.svg"
+        }
       },
       {
         "command": "pr-summary.selectJiraTicket",
-        "title": "Select JIRA Ticket for PR Summary"
+        "title": "PR Summary: Select JIRA Ticket",
+        "icon": {
+          "light": "media/pr-summary.svg",
+          "dark": "media/pr-summary.svg"
+        }
+      },
+      {
+        "command": "pr-summary.test",
+        "title": "PR Summary: TEST COMMAND"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pr-summary-container",
+          "title": "PR Summary",
+          "icon": "media/pr-summary.svg"
+        }
+      ]
+    },
+    "views": {
+      "pr-summary-container": [
+        {
+          "id": "pr-summary-actions",
+          "name": "Actions"
+        },
+        {
+          "id": "pr-summary-history",
+          "name": "History"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "pr-summary-actions",
+        "contents": "Generate PR summaries based on your Git commit history.\n[Generate PR Summary](command:pr-summary.generatePrSummary)\n[Select JIRA Ticket](command:pr-summary.selectJiraTicket)"
+      },
+      {
+        "view": "pr-summary-history",
+        "contents": "View your previously generated PR summaries.\n[View History](command:pr-summary.viewHistory)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pr-summary.generatePrSummary"
+        },
+        {
+          "command": "pr-summary.viewHistory"
+        },
+        {
+          "command": "pr-summary.selectJiraTicket"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "pr-summary.generatePrSummary",
+          "when": "view == pr-summary-actions",
+          "group": "navigation"
+        },
+        {
+          "command": "pr-summary.viewHistory",
+          "when": "view == pr-summary-history",
+          "group": "navigation"
+        },
+        {
+          "command": "pr-summary.selectJiraTicket",
+          "when": "view == pr-summary-actions",
+          "group": "1_generation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "pr-summary.generatePrSummary",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "pr-summary.generatePrSummary",
+          "group": "z_commands"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "pr-summary.generatePrSummary",
+        "key": "ctrl+alt+p g",
+        "mac": "cmd+alt+p g"
+      },
+      {
+        "command": "pr-summary.viewHistory",
+        "key": "ctrl+alt+p h",
+        "mac": "cmd+alt+p h"
+      },
+      {
+        "command": "pr-summary.selectJiraTicket",
+        "key": "ctrl+alt+p j",
+        "mac": "cmd+alt+p j"
+      },
+      {
+        "command": "pr-summary.test",
+        "key": "ctrl+alt+p t",
+        "mac": "cmd+alt+p t"
       }
     ],
     "configuration": {
@@ -100,7 +221,7 @@
     "axios": "^1.6.7"
   },
   "devDependencies": {
-    "@types/vscode": "^1.98.0",
+    "@types/vscode": "^1.96.2",
     "@types/mocha": "^10.0.8",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.7.0",

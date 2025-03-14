@@ -4,13 +4,53 @@ import * as vscode from "vscode";
 import { PrSummaryPanel } from "./ui/prSummaryPanel";
 import { JiraTicketSelector } from "./ui/jiraTicketSelector";
 import { HistoryPanel } from "./ui/historyPanel";
+import {
+  PRSummaryActionsProvider,
+  PRSummaryHistoryProvider,
+} from "./ui/viewProviders";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
-  console.log("PR Summary extension is now active!");
+  // Check if running in Cursor
+  const isCursor = vscode.env.appName.includes("Cursor");
+  console.log(
+    `PR Summary extension activating in ${vscode.env.appName} (Cursor: ${isCursor})`
+  );
+
+  // Write to filesystem for debugging
+  const fs = require("fs");
+  const path = require("path");
+  try {
+    const logPath = path.join(context.extensionPath, "activation.log");
+    fs.writeFileSync(
+      logPath,
+      `Extension activated at ${new Date().toISOString()} in ${
+        vscode.env.appName
+      }\n`,
+      { flag: "a" }
+    );
+  } catch (error) {
+    console.error("Failed to write debug log:", error);
+  }
+
+  // Force activate extension in Cursor by explicitly running a command at startup
+  if (isCursor) {
+    // Delay execution slightly to ensure UI is ready
+    setTimeout(() => {
+      console.log("Explicitly activating PR Summary extension in Cursor");
+      vscode.commands.executeCommand("pr-summary.test");
+    }, 3000);
+  }
+
+  // Show a notification when the extension activates
+
+  // Register Tree Data Providers for views
+  const actionsProvider = new PRSummaryActionsProvider();
+  const historyProvider = new PRSummaryHistoryProvider(context);
+
+  vscode.window.registerTreeDataProvider("pr-summary-actions", actionsProvider);
+  vscode.window.registerTreeDataProvider("pr-summary-history", historyProvider);
 
   // Register commands
   const generatePrSummaryCommand = vscode.commands.registerCommand(
@@ -43,6 +83,37 @@ export function activate(context: vscode.ExtensionContext) {
     viewHistoryCommand,
     selectJiraTicketCommand
   );
+
+  // Add a test command that's more visible
+  const testCommand = vscode.commands.registerCommand("pr-summary.test", () => {
+    vscode.window.showInformationMessage("PR Summary Test Command Works!");
+
+    // Create a status bar item
+    const statusBarItem = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      100
+    );
+    statusBarItem.text = "$(megaphone) PR Summary";
+    statusBarItem.tooltip = "Click to open PR Summary panel";
+    statusBarItem.command = "pr-summary.generatePrSummary";
+    statusBarItem.show();
+
+    context.subscriptions.push(statusBarItem);
+  });
+
+  context.subscriptions.push(testCommand);
+
+  // Create a visible status bar item on activation
+  const statusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100
+  );
+  statusBarItem.text = "$(git-pull-request) PR Summary";
+  statusBarItem.tooltip = "Click to open PR Summary panel";
+  statusBarItem.command = "pr-summary.generatePrSummary";
+  statusBarItem.show();
+
+  context.subscriptions.push(statusBarItem);
 }
 
 // This method is called when your extension is deactivated
