@@ -2,49 +2,72 @@ import * as vscode from "vscode";
 import { STORAGE_KEYS } from "../constants";
 
 export interface PrSummaryHistoryEntry {
-  timestamp: string;
-  title: string;
-  description: string;
+  created: number;
+  branchName: string;
+  jiraTicket?: string;
+  summary: string;
+  model: string;
   template: string;
 }
 
 export class HistoryManager {
+  private context: vscode.ExtensionContext;
+
+  constructor(context: vscode.ExtensionContext) {
+    this.context = context;
+  }
+
   /**
    * Save a PR summary to history
    */
-  static async savePrSummary(
-    context: vscode.ExtensionContext,
-    title: string,
-    description: string,
+  async saveSummary(
+    branchName: string,
+    jiraTicket: string | undefined,
+    summary: string,
+    model: string,
     template: string
   ): Promise<void> {
     // Get existing history
-    const history = await this.getPrSummaryHistory(context);
+    const history = await this.getHistory();
 
     // Create new entry
     const entry: PrSummaryHistoryEntry = {
-      timestamp: new Date().toISOString(),
-      title,
-      description,
+      created: Date.now(),
+      branchName,
+      jiraTicket,
+      summary,
+      model,
       template,
     };
 
-    // Add entry to history
+    // Add entry to history and save
     history.push(entry);
 
-    // Save updated history
-    await context.globalState.update(STORAGE_KEYS.PR_SUMMARY_HISTORY, history);
+    // Limit history to 50 entries
+    if (history.length > 50) {
+      history.shift(); // Remove oldest entry
+    }
+
+    // Save history
+    await this.context.globalState.update(STORAGE_KEYS.HISTORY, history);
   }
 
   /**
    * Get PR summary history
    */
-  static async getPrSummaryHistory(
-    context: vscode.ExtensionContext
-  ): Promise<PrSummaryHistoryEntry[]> {
-    const history = context.globalState.get<PrSummaryHistoryEntry[]>(
-      STORAGE_KEYS.PR_SUMMARY_HISTORY
+  async getHistory(): Promise<PrSummaryHistoryEntry[]> {
+    const history = this.context.globalState.get<PrSummaryHistoryEntry[]>(
+      STORAGE_KEYS.HISTORY,
+      []
     );
-    return history || [];
+
+    return history;
+  }
+
+  /**
+   * Clear PR summary history
+   */
+  async clearHistory(): Promise<void> {
+    await this.context.globalState.update(STORAGE_KEYS.HISTORY, []);
   }
 }

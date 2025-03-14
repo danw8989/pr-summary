@@ -23,11 +23,6 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onView:pr-summary-actions",
-    "onView:pr-summary-history",
-    "onCommand:pr-summary.generatePrSummary",
-    "onCommand:pr-summary.viewHistory",
-    "onCommand:pr-summary.selectJiraTicket",
     "onCommand:pr-summary.test"
   ],
   "main": "./dist/extension.js",
@@ -44,6 +39,14 @@
       {
         "command": "pr-summary.viewHistory",
         "title": "PR Summary: View History",
+        "icon": {
+          "light": "media/pr-summary.png",
+          "dark": "media/pr-summary.png"
+        }
+      },
+      {
+        "command": "pr-summary.viewHistoryItem",
+        "title": "PR Summary: View History Item",
         "icon": {
           "light": "media/pr-summary.png",
           "dark": "media/pr-summary.png"

@@ -90,7 +90,8 @@ export class HistoryPanel {
    * Load history and update the panel
    */
   private async _loadHistoryAndUpdate() {
-    this._history = await HistoryManager.getPrSummaryHistory(this._context);
+    const historyManager = new HistoryManager(this._context);
+    this._history = await historyManager.getHistory();
     this._update();
   }
 
@@ -108,7 +109,7 @@ export class HistoryPanel {
     // Create history items HTML
     const historyItemsHtml = this._history
       .map((entry, index) => {
-        const date = new Date(entry.timestamp);
+        const date = new Date(entry.created);
         const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 
         return `
@@ -117,7 +118,7 @@ export class HistoryPanel {
                     <span class="history-item-date">${formattedDate}</span>
                     <span class="history-item-template">${entry.template}</span>
                 </div>
-                <div class="history-item-title">${entry.title}</div>
+                <div class="history-item-title">${entry.branchName}</div>
             </div>`;
       })
       .join("");
@@ -249,20 +250,20 @@ export class HistoryPanel {
                             // Update details panel
                             detailsPanel.innerHTML = \`
                                 <div>
-                                    <h3>PR Title</h3>
+                                    <h3>PR Branch</h3>
                                     <div class="details-title">
-                                        <pre>\${entry.title}</pre>
-                                        <button class="copy-button" onclick="copyToClipboard('\${encodeURIComponent(entry.title)}')">Copy Title</button>
+                                        <pre>\${entry.branchName}</pre>
+                                        <button class="copy-button" onclick="copyToClipboard('\${encodeURIComponent(entry.branchName)}')">Copy Branch</button>
                                     </div>
                                     
-                                    <h3>PR Description</h3>
+                                    <h3>PR Summary</h3>
                                     <div class="details-description">
-                                        <pre>\${entry.description}</pre>
-                                        <button class="copy-button" onclick="copyToClipboard('\${encodeURIComponent(entry.description)}')">Copy Description</button>
+                                        <pre>\${entry.summary}</pre>
+                                        <button class="copy-button" onclick="copyToClipboard('\${encodeURIComponent(entry.summary)}')">Copy Summary</button>
                                     </div>
                                     
                                     <p>Template: \${entry.template}</p>
-                                    <p>Generated: \${new Date(entry.timestamp).toLocaleString()}</p>
+                                    <p>Generated: \${new Date(entry.created).toLocaleString()}</p>
                                 </div>
                             \`;
                         });

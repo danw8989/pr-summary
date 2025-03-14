@@ -94,10 +94,13 @@ export class MessageHandler {
       );
 
       // Save to history
-      await HistoryManager.savePrSummary(
-        this.context,
-        summary.title,
+      const historyManager = new HistoryManager(this.context);
+      const currentBranch = await GitHelper.getCurrentBranchName();
+      await historyManager.saveSummary(
+        currentBranch,
+        this._jiraTicket,
         summary.description,
+        model,
         template
       );
 

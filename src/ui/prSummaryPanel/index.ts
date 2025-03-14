@@ -5,6 +5,7 @@ import { TemplateManager } from "../../utils/templateManager";
 
 /**
  * Manages the PR Summary Panel webview
+ * Note: This still uses a WebView for the main UI, but we've migrated other parts to native VS Code UI
  */
 export class PrSummaryPanel {
   public static currentPanel: PrSummaryPanel | undefined;
@@ -53,7 +54,8 @@ export class PrSummaryPanel {
    */
   public static createOrShow(
     extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
+    jiraTicket?: string
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -62,6 +64,12 @@ export class PrSummaryPanel {
     // If we already have a panel, show it
     if (PrSummaryPanel.currentPanel) {
       PrSummaryPanel.currentPanel._panel.reveal(column);
+
+      // Set JIRA ticket if provided
+      if (jiraTicket) {
+        PrSummaryPanel.currentPanel.setJiraTicket(jiraTicket);
+      }
+
       // Refresh branches
       PrSummaryPanel.currentPanel._messageHandler.handleMessage({
         command: "getBranches",
@@ -86,6 +94,11 @@ export class PrSummaryPanel {
       extensionUri,
       context
     );
+
+    // Set JIRA ticket if provided
+    if (jiraTicket) {
+      PrSummaryPanel.currentPanel.setJiraTicket(jiraTicket);
+    }
   }
 
   /**

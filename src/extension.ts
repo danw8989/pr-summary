@@ -3,7 +3,6 @@
 import * as vscode from "vscode";
 import { PrSummaryPanel } from "./ui/prSummaryPanel";
 import { JiraTicketSelector } from "./ui/jiraTicketSelector";
-import { HistoryPanel } from "./ui/historyPanel";
 import {
   PRSummaryActionsProvider,
   PRSummaryHistoryProvider,
@@ -14,6 +13,9 @@ import { GitHelper } from "./utils/gitHelper";
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
   // Show a notification when the extension activates
+
+  // Set context in JiraTicketSelector
+  JiraTicketSelector.setContext(context);
 
   // Register Tree Data Providers for views
   const actionsProvider = new PRSummaryActionsProvider();
@@ -34,16 +36,24 @@ export function activate(context: vscode.ExtensionContext) {
   const viewHistoryCommand = vscode.commands.registerCommand(
     "pr-summary.viewHistory",
     () => {
-      // Open History Panel
-      HistoryPanel.createOrShow(context.extensionUri, context);
+      // Refresh the history view
+      historyProvider.refresh();
     }
   );
 
   const selectJiraTicketCommand = vscode.commands.registerCommand(
     "pr-summary.selectJiraTicket",
     () => {
-      // Open JIRA Ticket Selector
-      JiraTicketSelector.createOrShow(context.extensionUri);
+      // Open JIRA Ticket Selector (using new native UI)
+      JiraTicketSelector.show();
+    }
+  );
+
+  // Command to view a specific history item
+  const viewHistoryItemCommand = vscode.commands.registerCommand(
+    "pr-summary.viewHistoryItem",
+    (historyEntry) => {
+      historyProvider.viewHistoryItem(historyEntry);
     }
   );
 
@@ -51,7 +61,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     generatePrSummaryCommand,
     viewHistoryCommand,
-    selectJiraTicketCommand
+    selectJiraTicketCommand,
+    viewHistoryItemCommand
   );
 
   // Create a visible status bar item on activation

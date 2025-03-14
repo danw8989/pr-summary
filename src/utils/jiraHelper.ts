@@ -3,10 +3,26 @@ import axios from "axios";
 
 export interface JiraTicket {
   key: string;
+  summary: string;
+  description?: string;
+  status: string;
+  type?: string;
+  priority?: string;
+}
+
+// Original JiraTicket interface for API compatibility
+interface JiraApiTicket {
+  key: string;
   fields: {
     summary: string;
     description?: string;
     status?: {
+      name: string;
+    };
+    issuetype?: {
+      name: string;
+    };
+    priority?: {
       name: string;
     };
     [key: string]: any;
@@ -14,6 +30,38 @@ export interface JiraTicket {
 }
 
 export class JiraHelper {
+  private jiraUrl: string;
+  private jiraEmail: string;
+  private jiraApiToken: string;
+
+  constructor(jiraUrl: string, jiraEmail: string, jiraApiToken: string) {
+    this.jiraUrl = jiraUrl;
+    this.jiraEmail = jiraEmail;
+    this.jiraApiToken = jiraApiToken;
+  }
+
+  /**
+   * Get recent JIRA tickets
+   */
+  async getRecentTickets(project?: string): Promise<JiraTicket[]> {
+    const apiTickets = await JiraHelper.getJiraTickets(
+      this.jiraUrl,
+      this.jiraEmail,
+      this.jiraApiToken,
+      project
+    );
+
+    // Convert API tickets to simplified format
+    return apiTickets.map((ticket) => ({
+      key: ticket.key,
+      summary: ticket.fields.summary,
+      description: ticket.fields.description,
+      status: ticket.fields.status?.name || "Unknown",
+      type: ticket.fields.issuetype?.name || "Unknown",
+      priority: ticket.fields.priority?.name || "Unknown",
+    }));
+  }
+
   /**
    * Get JIRA tickets from the server
    */
@@ -22,7 +70,7 @@ export class JiraHelper {
     jiraEmail: string,
     jiraApiToken: string,
     project?: string
-  ): Promise<JiraTicket[]> {
+  ): Promise<JiraApiTicket[]> {
     if (!jiraUrl) {
       throw new Error("Missing JIRA URL");
     }
