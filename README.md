@@ -15,7 +15,7 @@ Generate comprehensive PR summaries using OpenAI's models based on your Git comm
 
 - A valid OpenAI API key
 - Git repository with commits
-- VS Code 1.98.0 or higher
+- VS Code 1.96.2 or higher
 
 ### Installation
 

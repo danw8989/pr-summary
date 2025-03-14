@@ -3,7 +3,8 @@
   "displayName": "PR Summary",
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
   "version": "0.0.1",
-  "publisher": "vscode-extensions",
+  "publisher": "InZarys",
+  "license": "MIT",
   "icon": "media/pr-summary.png",
   "engines": {
     "vscode": "^1.96.2"
@@ -21,7 +22,6 @@
     "jira"
   ],
   "activationEvents": [
-    "*",
     "onStartupFinished",
     "onView:pr-summary-actions",
     "onView:pr-summary-history",
@@ -236,10 +236,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/pr-summary.git"
+    "url": "https://github.com/danw8989/pr-summary.git"
   },
-  "homepage": "https://github.com/yourusername/pr-summary",
+  "homepage": "https://github.com/danw8989/pr-summary",
   "bugs": {
-    "url": "https://github.com/yourusername/pr-summary/issues"
+    "url": "https://github.com/danw8989/pr-summary/issues"
   }
 }
