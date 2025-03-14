@@ -62,10 +62,11 @@ export class GitHelper {
   }
 
   /**
-   * Get commit messages with optional diffs from origin/dev to current branch
+   * Get commit messages with optional diffs between source and target branches
    */
   static async getCommitMessagesWithDiff(
-    branch: string,
+    sourceBranch: string,
+    targetBranch: string = "main",
     includeDiffs: boolean = false
   ): Promise<string> {
     const gitLogCommand = ["git", "log", "--pretty=format:%s%n%n%b"];
@@ -74,7 +75,52 @@ export class GitHelper {
       gitLogCommand.push("-p");
     }
 
-    gitLogCommand.push(`origin/dev..${branch}`, "--", ".");
+    // Check if main exists, otherwise try master
+    try {
+      const { stdout: branchList } = await this.executeInWorkspaceRoot(
+        "git branch -a"
+      );
+
+      // If targetBranch is still default and main doesn't exist but master does
+      if (
+        targetBranch === "main" &&
+        !branchList.includes("main") &&
+        !branchList.includes("remotes/origin/main") &&
+        (branchList.includes("master") ||
+          branchList.includes("remotes/origin/master"))
+      ) {
+        targetBranch = "master";
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to check branch list, using provided target branch",
+        error
+      );
+    }
+
+    // Format for local branches: targetBranch..sourceBranch
+    // Format for remote branches: remotes/origin/targetBranch..sourceBranch
+    let compareSpec = `${targetBranch}..${sourceBranch}`;
+
+    // If target branch doesn't have a slash, check if remote version exists
+    if (!targetBranch.includes("/")) {
+      try {
+        const { stdout: remoteExists } = await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet remotes/origin/${targetBranch}`
+        );
+
+        if (remoteExists) {
+          compareSpec = `remotes/origin/${targetBranch}..${sourceBranch}`;
+        }
+      } catch (error) {
+        // Remote branch doesn't exist, use local
+        console.log(
+          `Remote branch origin/${targetBranch} not found, using local branch`
+        );
+      }
+    }
+
+    gitLogCommand.push(compareSpec, "--", ".");
 
     try {
       // Execute git command in workspace root
@@ -87,6 +133,75 @@ export class GitHelper {
       console.error(`Git error details: ${error}`);
 
       throw new Error(`Failed to get commit messages: ${error}`);
+    }
+  }
+
+  /**
+   * Get all available branches (both local and remote)
+   */
+  static async getAllBranches(): Promise<string[]> {
+    try {
+      // Get all branches including remotes
+      const { stdout } = await this.executeInWorkspaceRoot("git branch -a");
+
+      // Parse branch names from the output
+      // Example output:
+      // * feat/custom-templates
+      //   main
+      //   remotes/origin/HEAD -> origin/main
+      //   remotes/origin/dev
+      //   remotes/origin/main
+      const branches: string[] = [];
+      const lines = stdout.split("\n");
+
+      // Process each line to extract branch names
+      lines.forEach((line) => {
+        line = line.trim();
+
+        // Skip empty lines
+        if (!line) {
+          return;
+        }
+
+        // Remove the asterisk from current branch
+        if (line.startsWith("*")) {
+          line = line.substring(1).trim();
+        }
+
+        // Handle remote branch pointer (e.g., remotes/origin/HEAD -> origin/main)
+        if (line.includes(" -> ")) {
+          return; // Skip pointer lines
+        }
+
+        // For remote branches, extract the branch name (e.g., remotes/origin/main -> origin/main)
+        if (line.startsWith("remotes/")) {
+          line = line.substring("remotes/".length);
+        }
+
+        branches.push(line);
+      });
+
+      // Remove duplicates (e.g., main and origin/main)
+      const uniqueBranches = [...new Set(branches)];
+
+      // Sort branches with local branches first, then remote
+      uniqueBranches.sort((a, b) => {
+        const aIsRemote = a.includes("/");
+        const bIsRemote = b.includes("/");
+
+        if (aIsRemote && !bIsRemote) {
+          return 1;
+        }
+        if (!aIsRemote && bIsRemote) {
+          return -1;
+        }
+        return a.localeCompare(b);
+      });
+
+      return uniqueBranches;
+    } catch (error) {
+      console.error(`Failed to get branches: ${error}`);
+      return [];
     }
   }
 }

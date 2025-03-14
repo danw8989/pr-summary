@@ -178,6 +178,20 @@ export function getPrSummaryPanelHtml(
         </select>
     </div>
     
+    <div class="form-group">
+        <label for="sourceBranch">Source Branch:</label>
+        <select id="sourceBranch">
+            <option value="">Loading branches...</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="targetBranch">Target Branch:</label>
+        <select id="targetBranch">
+            <option value="">Loading branches...</option>
+        </select>
+    </div>
+    
     <button id="generateButton">Generate PR Summary</button>
     <div id="status"></div>
     
@@ -234,6 +248,8 @@ export function getPrSummaryPanelHtml(
             const includeDiffsCheckbox = document.getElementById('includeDiffs');
             const modelSelect = document.getElementById('model');
             const templateSelect = document.getElementById('template');
+            const sourceBranchSelect = document.getElementById('sourceBranch');
+            const targetBranchSelect = document.getElementById('targetBranch');
             const generateButton = document.getElementById('generateButton');
             const statusDiv = document.getElementById('status');
             const outputSection = document.getElementById('outputSection');
@@ -353,7 +369,9 @@ export function getPrSummaryPanelHtml(
                     template: templateSelect.value,
                     jiraUrl: jiraUrlInput.value,
                     jiraEmail: jiraEmailInput.value,
-                    jiraApiToken: jiraApiTokenInput.value
+                    jiraApiToken: jiraApiTokenInput.value,
+                    sourceBranch: sourceBranchSelect.value,
+                    targetBranch: targetBranchSelect.value
                 });
             }
             
@@ -435,12 +453,54 @@ export function getPrSummaryPanelHtml(
                     case 'templateDeleted':
                         showStatus('Template "' + message.name + '" deleted successfully');
                         break;
+                        
+                    case 'branchesLoaded':
+                        populateBranchDropdowns(message.branches, message.currentBranch);
+                        break;
                 }
             });
             
             // Request custom templates on load
             vscode.postMessage({
                 command: 'getCustomTemplates'
+            });
+
+            // Function to populate branch dropdowns
+            function populateBranchDropdowns(branches, currentBranch) {
+                // Clear options
+                sourceBranchSelect.innerHTML = '';
+                targetBranchSelect.innerHTML = '';
+                
+                // Add default option for target branch
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                targetBranchSelect.appendChild(defaultOption);
+                
+                // Add branches to dropdowns
+                branches.forEach(branch => {
+                    // Source branch option
+                    const sourceOption = document.createElement('option');
+                    sourceOption.value = branch;
+                    sourceOption.textContent = branch;
+                    
+                    // Select current branch by default for source
+                    if (branch === currentBranch) {
+                        sourceOption.selected = true;
+                    }
+                    
+                    sourceBranchSelect.appendChild(sourceOption);
+                    
+                    // Target branch option (skip current branch)
+                    const targetOption = document.createElement('option');
+                    targetOption.value = branch;
+                    targetOption.textContent = branch;
+                    targetBranchSelect.appendChild(targetOption);
+                });
+            }
+
+            // Request branches on load
+            vscode.postMessage({
+                command: 'getBranches'
             });
         })();
     </script>

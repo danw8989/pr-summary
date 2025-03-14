@@ -16,12 +16,16 @@ export class OpenAIHelper {
     additionalPrompt: string,
     includeDiffs: boolean,
     jiraTicket: string | undefined,
-    model: string
+    model: string,
+    sourceBranch?: string,
+    targetBranch?: string
   ): Promise<PrSummary> {
     // Get branch name and commit messages
-    const branchName = await GitHelper.getCurrentBranchName();
+    const currentBranch = await GitHelper.getCurrentBranchName();
+    const branchName = sourceBranch || currentBranch;
     const commitMessagesWithDiff = await GitHelper.getCommitMessagesWithDiff(
       branchName,
+      targetBranch,
       includeDiffs
     );
 

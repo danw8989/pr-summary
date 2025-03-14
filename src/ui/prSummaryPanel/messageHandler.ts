@@ -3,6 +3,7 @@ import { OpenAIHelper, PrSummary } from "../../utils/openAiHelper";
 import { HistoryManager } from "../../utils/historyManager";
 import { TEMPLATE_PROMPTS } from "../../constants";
 import { TemplateManager } from "../../utils/templateManager";
+import { GitHelper } from "../../utils/gitHelper";
 
 /**
  * Class handling messages from the PR Summary Panel webview
@@ -25,7 +26,9 @@ export class MessageHandler {
           message.additionalPrompt,
           message.includeDiffs,
           message.model,
-          message.template
+          message.template,
+          message.sourceBranch,
+          message.targetBranch
         );
         break;
       case "selectJiraTicket":
@@ -51,6 +54,9 @@ export class MessageHandler {
       case "getCustomTemplates":
         await this.handleGetCustomTemplates();
         break;
+      case "getBranches":
+        await this.handleGetBranches();
+        break;
     }
   }
 
@@ -62,7 +68,9 @@ export class MessageHandler {
     additionalPrompt: string,
     includeDiffs: boolean,
     model: string,
-    template: string
+    template: string,
+    sourceBranch?: string,
+    targetBranch?: string
   ): Promise<void> {
     try {
       // Get all templates including custom ones
@@ -80,7 +88,9 @@ export class MessageHandler {
         fullPrompt,
         includeDiffs,
         this._jiraTicket,
-        model
+        model,
+        sourceBranch,
+        targetBranch
       );
 
       // Save to history
@@ -229,5 +239,27 @@ export class MessageHandler {
    */
   public getJiraTicket(): string | undefined {
     return this._jiraTicket;
+  }
+
+  /**
+   * Get all available git branches and send them to the webview
+   */
+  private async handleGetBranches(): Promise<void> {
+    try {
+      const branches = await GitHelper.getAllBranches();
+      const currentBranch = await GitHelper.getCurrentBranchName();
+
+      // Send branches to webview
+      this.webview.postMessage({
+        type: "branchesLoaded",
+        branches: branches,
+        currentBranch: currentBranch,
+      });
+    } catch (error) {
+      this.webview.postMessage({
+        type: "error",
+        message: `Failed to load branches: ${error}`,
+      });
+    }
   }
 }

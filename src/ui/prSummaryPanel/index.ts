@@ -62,6 +62,10 @@ export class PrSummaryPanel {
     // If we already have a panel, show it
     if (PrSummaryPanel.currentPanel) {
       PrSummaryPanel.currentPanel._panel.reveal(column);
+      // Refresh branches
+      PrSummaryPanel.currentPanel._messageHandler.handleMessage({
+        command: "getBranches",
+      });
       return;
     }
 
