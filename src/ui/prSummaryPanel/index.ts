@@ -29,6 +29,12 @@ export class PrSummaryPanel {
       undefined
     );
 
+    // Set webview options to include toolkit script
+    this._panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
+    };
+
     this._update();
 
     // Set up message handling
@@ -86,6 +92,8 @@ export class PrSummaryPanel {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
+        enableFindWidget: true,
+        enableCommandUris: true,
       }
     );
 
@@ -118,6 +126,18 @@ export class PrSummaryPanel {
   }
 
   /**
+   * Get webview URI for a file in the media folder
+   * @param fileName Name of the file in the media folder
+   * @returns URI for the file for use in the webview
+   */
+  private _getMediaUri(fileName: string): string {
+    const mediaUri = this._panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", fileName)
+    );
+    return mediaUri.toString();
+  }
+
+  /**
    * Update the panel content
    */
   private async _update() {
@@ -145,7 +165,11 @@ export class PrSummaryPanel {
       this._context
     );
 
-    this._panel.webview.html = getPrSummaryPanelHtml(
+    // Get toolkit URI
+    const toolkitUri = this._getMediaUri("toolkit.min.js");
+
+    // Replace the toolkit.min.js placeholder with the actual URI
+    const html = getPrSummaryPanelHtml(
       openaiApiKey,
       jiraUrl,
       jiraEmail,
@@ -154,7 +178,9 @@ export class PrSummaryPanel {
       defaultTemplate,
       jiraTicketDisplay,
       allTemplateOptions
-    );
+    ).replace('src="toolkit.min.js"', `src="${toolkitUri}"`);
+
+    this._panel.webview.html = html;
   }
 
   /**
