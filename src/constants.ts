@@ -16,4 +16,5 @@ export const TEMPLATE_OPTIONS = ["Short", "Medium", "Long", "Thorough"];
 // Context value storage keys
 export const STORAGE_KEYS = {
   PR_SUMMARY_HISTORY: "prSummaryHistory",
+  CUSTOM_TEMPLATES: "customTemplates",
 };

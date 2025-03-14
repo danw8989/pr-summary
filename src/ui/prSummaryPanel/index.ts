@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { MessageHandler } from "./messageHandler";
 import { getPrSummaryPanelHtml } from "./template";
+import { TemplateManager } from "../../utils/templateManager";
 
 /**
  * Manages the PR Summary Panel webview
@@ -40,6 +41,11 @@ export class PrSummaryPanel {
 
     // Handle panel being closed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    // Load custom templates
+    setTimeout(() => {
+      this._messageHandler.handleMessage({ command: "getCustomTemplates" });
+    }, 500);
   }
 
   /**
@@ -97,7 +103,7 @@ export class PrSummaryPanel {
   /**
    * Update the panel content
    */
-  private _update() {
+  private async _update() {
     const config = vscode.workspace.getConfiguration("prSummary");
 
     // Try to get values from environment variables first, then fall back to VS Code settings
@@ -117,6 +123,11 @@ export class PrSummaryPanel {
 
     const jiraTicketDisplay = this._messageHandler.getJiraTicket() || "";
 
+    // Get all template options including custom ones
+    const allTemplateOptions = await TemplateManager.getAllTemplateOptions(
+      this._context
+    );
+
     this._panel.webview.html = getPrSummaryPanelHtml(
       openaiApiKey,
       jiraUrl,
@@ -124,7 +135,8 @@ export class PrSummaryPanel {
       jiraApiToken,
       defaultModel,
       defaultTemplate,
-      jiraTicketDisplay
+      jiraTicketDisplay,
+      allTemplateOptions
     );
   }
 

@@ -8,6 +8,7 @@ import {
   PRSummaryActionsProvider,
   PRSummaryHistoryProvider,
 } from "./ui/viewProviders";
+import { GitHelper } from "./utils/gitHelper";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -52,25 +53,6 @@ export function activate(context: vscode.ExtensionContext) {
     viewHistoryCommand,
     selectJiraTicketCommand
   );
-
-  // Add a test command that's more visible
-  const testCommand = vscode.commands.registerCommand("pr-summary.test", () => {
-    vscode.window.showInformationMessage("PR Summary Test Command Works!");
-
-    // Create a status bar item
-    const statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100
-    );
-    statusBarItem.text = "$(megaphone) PR Summary";
-    statusBarItem.tooltip = "Click to open PR Summary panel";
-    statusBarItem.command = "pr-summary.generatePrSummary";
-    statusBarItem.show();
-
-    context.subscriptions.push(statusBarItem);
-  });
-
-  context.subscriptions.push(testCommand);
 
   // Create a visible status bar item on activation
   const statusBarItem = vscode.window.createStatusBarItem(

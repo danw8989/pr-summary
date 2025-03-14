@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { OpenAIHelper, PrSummary } from "../../utils/openAiHelper";
 import { HistoryManager } from "../../utils/historyManager";
 import { TEMPLATE_PROMPTS } from "../../constants";
+import { TemplateManager } from "../../utils/templateManager";
 
 /**
  * Class handling messages from the PR Summary Panel webview
@@ -38,6 +39,18 @@ export class MessageHandler {
         await vscode.env.clipboard.writeText(message.text);
         vscode.window.showInformationMessage("Copied to clipboard");
         break;
+      case "saveCustomTemplate":
+        await this.handleSaveCustomTemplate(
+          message.templateName,
+          message.templatePrompt
+        );
+        break;
+      case "deleteCustomTemplate":
+        await this.handleDeleteCustomTemplate(message.templateName);
+        break;
+      case "getCustomTemplates":
+        await this.handleGetCustomTemplates();
+        break;
     }
   }
 
@@ -52,8 +65,13 @@ export class MessageHandler {
     template: string
   ): Promise<void> {
     try {
+      // Get all templates including custom ones
+      const allTemplates = await TemplateManager.getAllTemplatePrompts(
+        this.context
+      );
+
       // Get template prompt
-      const templatePrompt = TEMPLATE_PROMPTS[template];
+      const templatePrompt = allTemplates[template];
       const fullPrompt = `${templatePrompt} ${additionalPrompt}`.trim();
 
       // Generate summary
@@ -90,6 +108,87 @@ export class MessageHandler {
       this.webview.postMessage({
         type: "error",
         message: `${error}`,
+      });
+    }
+  }
+
+  /**
+   * Handle saving a custom template
+   */
+  private async handleSaveCustomTemplate(
+    templateName: string,
+    templatePrompt: string
+  ): Promise<void> {
+    try {
+      await TemplateManager.saveCustomTemplate(
+        this.context,
+        templateName,
+        templatePrompt
+      );
+
+      // Refresh template list
+      await this.handleGetCustomTemplates();
+
+      // Send success message
+      this.webview.postMessage({
+        type: "templateSaved",
+        name: templateName,
+      });
+    } catch (error) {
+      this.webview.postMessage({
+        type: "error",
+        message: `Failed to save template: ${error}`,
+      });
+    }
+  }
+
+  /**
+   * Handle deleting a custom template
+   */
+  private async handleDeleteCustomTemplate(
+    templateName: string
+  ): Promise<void> {
+    try {
+      await TemplateManager.deleteCustomTemplate(this.context, templateName);
+
+      // Refresh template list
+      await this.handleGetCustomTemplates();
+
+      // Send success message
+      this.webview.postMessage({
+        type: "templateDeleted",
+        name: templateName,
+      });
+    } catch (error) {
+      this.webview.postMessage({
+        type: "error",
+        message: `Failed to delete template: ${error}`,
+      });
+    }
+  }
+
+  /**
+   * Handle getting all custom templates
+   */
+  private async handleGetCustomTemplates(): Promise<void> {
+    try {
+      const customTemplates = await TemplateManager.getCustomTemplates(
+        this.context
+      );
+      const allOptions = await TemplateManager.getAllTemplateOptions(
+        this.context
+      );
+
+      // Send templates to webview
+      this.webview.postMessage({
+        type: "templatesLoaded",
+        templates: customTemplates,
+        allOptions: allOptions,
+      });
+    } catch (error) {
+      this.webview.postMessage({
+        type: "error",
+        message: `Failed to load templates: ${error}`,
       });
     }
   }

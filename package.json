@@ -2,7 +2,7 @@
   "name": "pr-summary",
   "displayName": "PR Summary",
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
@@ -56,10 +56,6 @@
           "light": "media/pr-summary.png",
           "dark": "media/pr-summary.png"
         }
-      },
-      {
-        "command": "pr-summary.test",
-        "title": "PR Summary: TEST COMMAND"
       }
     ],
     "viewsContainers": {
@@ -135,28 +131,6 @@
         }
       ]
     },
-    "keybindings": [
-      {
-        "command": "pr-summary.generatePrSummary",
-        "key": "ctrl+alt+p g",
-        "mac": "cmd+alt+p g"
-      },
-      {
-        "command": "pr-summary.viewHistory",
-        "key": "ctrl+alt+p h",
-        "mac": "cmd+alt+p h"
-      },
-      {
-        "command": "pr-summary.selectJiraTicket",
-        "key": "ctrl+alt+p j",
-        "mac": "cmd+alt+p j"
-      },
-      {
-        "command": "pr-summary.test",
-        "key": "ctrl+alt+p t",
-        "mac": "cmd+alt+p t"
-      }
-    ],
     "configuration": {
       "title": "PR Summary",
       "properties": {
