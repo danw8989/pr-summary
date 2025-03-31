@@ -42,7 +42,37 @@ export class GitHelper {
       const { stdout } = await this.executeInWorkspaceRoot(
         "git rev-parse --abbrev-ref HEAD"
       );
-      return stdout.trim();
+
+      const currentBranch = stdout.trim();
+      console.log(`Git current branch detection: "${currentBranch}"`);
+
+      // Double-check by using status command as backup
+      try {
+        const { stdout: statusOutput } = await this.executeInWorkspaceRoot(
+          "git status -b --porcelain=v2 | grep 'branch.head'"
+        );
+
+        if (statusOutput) {
+          const match = statusOutput.match(/branch\.head\s+(.+)/);
+          if (match && match[1]) {
+            const statusBranch = match[1].trim();
+            console.log(`Git status branch detection: "${statusBranch}"`);
+
+            // If different from rev-parse, use this one
+            if (statusBranch !== currentBranch) {
+              console.log(
+                `Branch mismatch detected. Using status branch: "${statusBranch}"`
+              );
+              return statusBranch;
+            }
+          }
+        }
+      } catch (statusError) {
+        console.log(`Failed to get branch from status: ${statusError}`);
+        // Continue with the rev-parse result
+      }
+
+      return currentBranch;
     } catch (error) {
       // Log more detailed error information
       console.error(`Git error details: ${error}`);

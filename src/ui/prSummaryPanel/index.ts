@@ -58,7 +58,7 @@ export class PrSummaryPanel {
   /**
    * Create or show the PR Summary panel
    */
-  public static createOrShow(
+  public static async createOrShow(
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
     jiraTicket?: string
@@ -77,7 +77,7 @@ export class PrSummaryPanel {
       }
 
       // Refresh branches
-      PrSummaryPanel.currentPanel._messageHandler.handleMessage({
+      await PrSummaryPanel.currentPanel._messageHandler.handleMessage({
         command: "getBranches",
       });
       return;
@@ -108,7 +108,15 @@ export class PrSummaryPanel {
       PrSummaryPanel.currentPanel.setJiraTicket(jiraTicket);
     }
     // Ensure the panel content is updated after potential ticket setting
-    PrSummaryPanel.currentPanel._update();
+    await PrSummaryPanel.currentPanel._update();
+
+    // Load branches before showing the panel
+    await PrSummaryPanel.currentPanel._messageHandler.handleMessage({
+      command: "getBranches",
+    });
+
+    // Show the panel after everything is loaded
+    panel.reveal(column);
   }
 
   /**

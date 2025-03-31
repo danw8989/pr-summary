@@ -501,20 +501,28 @@ export function getPrSummaryPanelHtml(
                 elements.targetBranchSelect.appendChild(defaultOption);
 
                 // Add branches
-                branches.forEach(branch => {
-                    const sourceOption = document.createElement('vscode-option');
-                    sourceOption.value = branch;
-                    sourceOption.textContent = branch;
-                    if (branch === currentBranch) {
-                        sourceOption.selected = true;
-                    }
-                    elements.sourceBranchSelect.appendChild(sourceOption);
+                if (branches.length > 0) {
+                    // Always select the first branch for source (which is current branch)
+                    let isFirstBranch = true;
+                    
+                    branches.forEach(branch => {
+                        const sourceOption = document.createElement('vscode-option');
+                        sourceOption.value = branch;
+                        sourceOption.textContent = branch;
+                        
+                        // If it's the first branch or matches current branch
+                        if (isFirstBranch || branch === currentBranch) {
+                            sourceOption.selected = true;
+                            isFirstBranch = false;
+                        }
+                        elements.sourceBranchSelect.appendChild(sourceOption);
 
-                    const targetOption = document.createElement('vscode-option');
-                    targetOption.value = branch;
-                    targetOption.textContent = branch;
-                    elements.targetBranchSelect.appendChild(targetOption);
-                });
+                        const targetOption = document.createElement('vscode-option');
+                        targetOption.value = branch;
+                        targetOption.textContent = branch;
+                        elements.targetBranchSelect.appendChild(targetOption);
+                    });
+                }
             }
 
             // --- Message Handling ---
