@@ -3,21 +3,18 @@ import { JiraHelper, JiraTicket } from "../utils/jiraHelper";
 import { PrSummaryPanel } from "./prSummaryPanel";
 
 export class JiraTicketSelector {
-  // Store the selected ticket for use in other parts of the extension
-  private static selectedTicket: string | undefined;
-  private static extensionContext: vscode.ExtensionContext | undefined;
+  // Store the selected ticket for this instance
+  private _selectedTicket: string | undefined;
+  private readonly _context: vscode.ExtensionContext;
 
-  /**
-   * Set the extension context
-   */
-  public static setContext(context: vscode.ExtensionContext) {
-    this.extensionContext = context;
+  constructor(context: vscode.ExtensionContext) {
+    this._context = context;
   }
 
   /**
    * Show the JIRA ticket selector using VS Code Quick Pick
    */
-  public static async show() {
+  public async show() {
     // Get configuration
     const config = vscode.workspace.getConfiguration("prSummary");
     const jiraUrl = config.get<string>("jiraUrl") || "";
@@ -92,7 +89,7 @@ export class JiraTicketSelector {
 
           if (selection) {
             const formattedTicket = `${selection.label}: ${selection.description}`;
-            this.selectedTicket = formattedTicket;
+            this._selectedTicket = formattedTicket; // Store on instance
 
             // Ask if user wants to open PR Summary panel
             const openPRSummary = "Open PR Summary";
@@ -102,18 +99,12 @@ export class JiraTicketSelector {
             );
 
             if (response === openPRSummary) {
-              // Open PR Summary with selected ticket
-              if (this.extensionContext) {
-                PrSummaryPanel.createOrShow(
-                  this.extensionContext.extensionUri,
-                  this.extensionContext,
-                  formattedTicket
-                );
-              } else {
-                vscode.window.showErrorMessage(
-                  "Extension context not available"
-                );
-              }
+              // Open PR Summary with selected ticket using instance context
+              PrSummaryPanel.createOrShow(
+                this._context.extensionUri,
+                this._context,
+                formattedTicket
+              );
             }
           }
         } catch (error) {
@@ -128,9 +119,9 @@ export class JiraTicketSelector {
   }
 
   /**
-   * Get the currently selected JIRA ticket
+   * Get the currently selected JIRA ticket for this instance
    */
-  public static getSelectedTicket(): string | undefined {
-    return this.selectedTicket;
+  public getSelectedTicket(): string | undefined {
+    return this._selectedTicket;
   }
 }

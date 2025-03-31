@@ -9,26 +9,34 @@ import {
 } from "./ui/viewProviders";
 import { GitHelper } from "./utils/gitHelper";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-  // Show a notification when the extension activates
-
-  // Set context in JiraTicketSelector
-  JiraTicketSelector.setContext(context);
-
-  // Register Tree Data Providers for views
+function registerProviders(
+  context: vscode.ExtensionContext
+): PRSummaryHistoryProvider {
   const actionsProvider = new PRSummaryActionsProvider();
   const historyProvider = new PRSummaryHistoryProvider(context);
 
-  vscode.window.registerTreeDataProvider("pr-summary-actions", actionsProvider);
-  vscode.window.registerTreeDataProvider("pr-summary-history", historyProvider);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider(
+      "pr-summary-actions",
+      actionsProvider
+    ),
+    vscode.window.registerTreeDataProvider(
+      "pr-summary-history",
+      historyProvider
+    )
+  );
 
-  // Register commands
+  return historyProvider;
+}
+
+function registerCommands(
+  context: vscode.ExtensionContext,
+  historyProvider: PRSummaryHistoryProvider,
+  jiraTicketSelector: JiraTicketSelector // Add instance parameter
+) {
   const generatePrSummaryCommand = vscode.commands.registerCommand(
     "pr-summary.generatePrSummary",
     () => {
-      // Open PR Summary Panel
       PrSummaryPanel.createOrShow(context.extensionUri, context);
     }
   );
@@ -36,7 +44,6 @@ export function activate(context: vscode.ExtensionContext) {
   const viewHistoryCommand = vscode.commands.registerCommand(
     "pr-summary.viewHistory",
     () => {
-      // Refresh the history view
       historyProvider.refresh();
     }
   );
@@ -44,12 +51,10 @@ export function activate(context: vscode.ExtensionContext) {
   const selectJiraTicketCommand = vscode.commands.registerCommand(
     "pr-summary.selectJiraTicket",
     () => {
-      // Open JIRA Ticket Selector (using new native UI)
-      JiraTicketSelector.show();
+      jiraTicketSelector.show(); // Call show() on the instance
     }
   );
 
-  // Command to view a specific history item
   const viewHistoryItemCommand = vscode.commands.registerCommand(
     "pr-summary.viewHistoryItem",
     (historyEntry) => {
@@ -57,15 +62,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  // Add commands to context
   context.subscriptions.push(
     generatePrSummaryCommand,
     viewHistoryCommand,
     selectJiraTicketCommand,
     viewHistoryItemCommand
   );
+}
 
-  // Create a visible status bar item on activation
+function registerStatusBarItem(context: vscode.ExtensionContext) {
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100
@@ -76,6 +81,21 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.show();
 
   context.subscriptions.push(statusBarItem);
+}
+
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
+export function activate(context: vscode.ExtensionContext) {
+  // Create instances of components that need context
+  const jiraTicketSelector = new JiraTicketSelector(context);
+
+  // Register UI Components
+  const historyProvider = registerProviders(context);
+  registerCommands(context, historyProvider, jiraTicketSelector); // Pass instance
+  registerStatusBarItem(context);
+
+  // Optional: Log activation
+  console.log('Congratulations, your extension "pr-summary" is now active!');
 }
 
 // This method is called when your extension is deactivated

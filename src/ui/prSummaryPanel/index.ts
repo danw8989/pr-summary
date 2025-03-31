@@ -25,8 +25,7 @@ export class PrSummaryPanel {
     this._context = context;
     this._messageHandler = new MessageHandler(
       this._panel.webview,
-      this._context,
-      undefined
+      this._context
     );
 
     // Set webview options to include toolkit script
@@ -35,7 +34,8 @@ export class PrSummaryPanel {
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
     };
 
-    this._update();
+    // Initial update is now handled after potential ticket setting in createOrShow
+    // this._update();
 
     // Set up message handling
     this._panel.webview.onDidReceiveMessage(
@@ -103,10 +103,12 @@ export class PrSummaryPanel {
       context
     );
 
-    // Set JIRA ticket if provided
+    // Set JIRA ticket if provided and update the panel content
     if (jiraTicket) {
       PrSummaryPanel.currentPanel.setJiraTicket(jiraTicket);
     }
+    // Ensure the panel content is updated after potential ticket setting
+    PrSummaryPanel.currentPanel._update();
   }
 
   /**
@@ -158,7 +160,8 @@ export class PrSummaryPanel {
       process.env.DEFAULT_TEMPLATE ||
       config.get<string>("defaultTemplate", "Medium");
 
-    const jiraTicketDisplay = this._messageHandler.getJiraTicket() || "";
+    // Jira ticket display is now handled by the webview receiving 'jiraTicketSelected' messages
+    const jiraTicketDisplay = ""; // Keep variable for template function signature, but it's not used for initial state
 
     // Get all template options including custom ones
     const allTemplateOptions = await TemplateManager.getAllTemplateOptions(
