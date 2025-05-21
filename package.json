@@ -159,12 +159,10 @@
         },
         "prSummary.defaultModel": {
           "type": "string",
-          "default": "o3-mini",
+          "default": "gpt-4o-mini",
           "enum": [
-            "o3-mini",
-            "o1-preview",
-            "o1-mini",
-            "gpt-4o"
+            "gpt-4o",
+            "gpt-4o-mini"
           ],
           "description": "Default OpenAI model to use for generating PR summaries"
         },

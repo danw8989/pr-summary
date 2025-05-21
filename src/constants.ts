@@ -8,7 +8,7 @@ export const TEMPLATE_PROMPTS: Record<string, string> = {
 };
 
 // Models
-export const OPENAI_MODELS = ["o3-mini", "o1-preview", "o1-mini", "gpt-4o"];
+export const OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini"];
 
 // Template options
 export const TEMPLATE_OPTIONS = ["Short", "Medium", "Long", "Thorough"];

@@ -3,6 +3,7 @@ import { SummaryHandler } from "./handlers/summaryHandler";
 import { TemplateHandler } from "./handlers/templateHandler";
 import { JiraHandler } from "./handlers/jiraHandler";
 import { GitHandler } from "./handlers/gitHandler";
+import { OpenAIHelper } from "../../utils/openAiHelper";
 
 /**
  * Class handling messages from the PR Summary Panel webview.
@@ -74,6 +75,27 @@ export class MessageHandler {
         break;
       case "getBranches":
         await this.gitHandler.handleGetBranches();
+        break;
+      case "getOpenAIModels":
+        try {
+          const models = await OpenAIHelper.fetchChatModels(
+            message.openaiApiKey
+          );
+          this.webview.postMessage({
+            type: "openaiModelsLoaded",
+            models: models,
+          });
+        } catch (error) {
+          console.error("Error fetching OpenAI models for webview:", error);
+          // Send fallback models (or an empty list and let webview handle it)
+          // For now, relying on fetchChatModels' internal fallback
+          const fallbackModels = await OpenAIHelper.fetchChatModels(""); // Trigger fallback
+          this.webview.postMessage({
+            type: "openaiModelsLoaded",
+            models: fallbackModels, // Send fallback models
+            error: `Failed to fetch models: ${error}`,
+          });
+        }
         break;
       case "openSettings": // Added case
         // Open VS Code settings, focused on this extension's settings

@@ -13,13 +13,9 @@ export function getPrSummaryPanelHtml(
   jiraTicketDisplay: string = "", // This is now less relevant for initial display
   templateOptions: string[] = TEMPLATE_OPTIONS
 ): string {
-  // Generate model options HTML
-  const modelOptionsHtml = OPENAI_MODELS.map(
-    (model) =>
-      `<vscode-option value="${model}" ${
-        model === defaultModel ? "selected" : ""
-      }>${model}</vscode-option>`
-  ).join("");
+  // Generate model options HTML - This will now be populated by JavaScript
+  const modelOptionsHtml =
+    '<vscode-option value="">Loading models...</vscode-option>';
 
   // Generate template options HTML
   const templateOptionsHtml = templateOptions
@@ -356,9 +352,14 @@ export function getPrSummaryPanelHtml(
                 elements.openSettingsButton?.addEventListener('click', openSettings);
 
                 // Add listeners for config inputs to potentially re-enable buttons if filled
-                ['openaiApiKeyInput', 'jiraUrlInput', 'jiraEmailInput', 'jiraApiTokenInput'].forEach(id => {
-                    elements[id]?.addEventListener('input', checkConfiguration);
+                elements.openaiApiKeyInput?.addEventListener('input', () => {
+                    checkConfiguration();
+                    requestOpenAIModels(); // Request models when API key changes
                 });
+                elements.jiraUrlInput?.addEventListener('input', checkConfiguration);
+                elements.jiraEmailInput?.addEventListener('input', checkConfiguration);
+                elements.jiraApiTokenInput?.addEventListener('input', checkConfiguration);
+                
 
                 window.addEventListener('message', handleExtensionMessage);
             }
@@ -438,6 +439,19 @@ export function getPrSummaryPanelHtml(
 
             function openSettings() {
                  vscode.postMessage({ command: 'openSettings' }); // Ask extension to open settings
+            }
+
+            function requestOpenAIModels() {
+                const apiKey = elements.openaiApiKeyInput.value;
+                if (apiKey) {
+                    vscode.postMessage({
+                        command: 'getOpenAIModels',
+                        openaiApiKey: apiKey
+                    });
+                } else {
+                    // Optionally clear models or show a message if API key is removed
+                    populateModelDropdown([], ''); // Clear or show fallback
+                }
             }
 
             // --- UI Update Functions ---
@@ -525,6 +539,32 @@ export function getPrSummaryPanelHtml(
                 }
             }
 
+            function populateModelDropdown(models, defaultModelFromSettings) {
+                if (!elements.modelSelect) return;
+                elements.modelSelect.innerHTML = ''; // Clear existing options
+
+                if (!models || models.length === 0) {
+                    // This case should ideally be handled by the fallback in the extension
+                    elements.modelSelect.innerHTML = '<vscode-option value=\"\">No models available</vscode-option>';
+                    return;
+                }
+
+                models.forEach(modelId => {
+                    const option = document.createElement('vscode-option');
+                    option.value = modelId;
+                    option.textContent = modelId;
+                    if (modelId === defaultModelFromSettings) {
+                        option.selected = true;
+                    }
+                    elements.modelSelect.appendChild(option);
+                });
+
+                // If no model was selected and there are models, select the first one
+                if (!elements.modelSelect.value && models.length > 0) {
+                    elements.modelSelect.value = models[0];
+                }
+            }
+
             // --- Message Handling ---
             function handleExtensionMessage(event) {
                 const message = event.data;
@@ -573,6 +613,17 @@ export function getPrSummaryPanelHtml(
                     case 'branchesLoaded':
                         populateBranchDropdowns(message.branches, message.currentBranch);
                         break;
+                    case 'openaiModelsLoaded': // New case
+                        const defaultModelFromSettings = "${defaultModel}"; // Get this from initial HTML data
+                        populateModelDropdown(message.models, defaultModelFromSettings);
+                        if (message.error) {
+                            showStatus(\`Models loaded with fallback: \${message.error}\`, 'info');
+                        } else if (message.models && message.models.length > 0) {
+                            showStatus('OpenAI models loaded.', 'info');
+                        } else {
+                            showStatus('No OpenAI models loaded. Using fallback.', 'info');
+                        }
+                        break;
                 }
             }
 
@@ -590,6 +641,7 @@ export function getPrSummaryPanelHtml(
                 // Request initial data
                 vscode.postMessage({ command: 'getCustomTemplates' });
                 vscode.postMessage({ command: 'getBranches' });
+                requestOpenAIModels(); // Request models on initial load if API key is present
                 console.log("PR Summary Panel UI Initialized.");
             }
 

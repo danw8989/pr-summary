@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import OpenAI from "openai";
 import { GitHelper } from "./gitHelper";
+import { OPENAI_MODELS as FALLBACK_MODELS } from "../constants"; // Import fallback
 
 export interface PrSummary {
   title: string;
@@ -72,6 +73,66 @@ export class OpenAIHelper {
       };
     } catch (error) {
       throw new Error(`OpenAI API request error: ${error}`);
+    }
+  }
+
+  /**
+   * Fetch available chat models from OpenAI API, with filtering.
+   * Falls back to a minimal list if fetching or filtering fails.
+   */
+  static async fetchChatModels(apiKey: string): Promise<string[]> {
+    if (!apiKey) {
+      console.warn(
+        "No API key provided for fetching models, returning fallback."
+      );
+      return FALLBACK_MODELS;
+    }
+
+    try {
+      const openai = new OpenAI({ apiKey });
+      const modelsResponse = await openai.models.list();
+      const allModels = modelsResponse.data;
+
+      const chatModelPrefixes = ["gpt-", "o1-", "o3-"];
+      const excludedSubstrings = [
+        "instruct",
+        "vision",
+        "audio",
+        "embedding",
+        "image",
+        "dall-e",
+        "whisper",
+        "tts",
+        "moderation",
+        "search", // Can be fine-tuned if some search models are desired
+        "babbage", // Older completion model
+        "davinci", // Older completion model
+        "curie", // Older completion model
+        "ada", // Older completion model
+      ];
+
+      const filteredModels = allModels
+        .map((model) => model.id)
+        .filter(
+          (id) =>
+            chatModelPrefixes.some((prefix) => id.startsWith(prefix)) &&
+            !excludedSubstrings.some((substring) => id.includes(substring))
+        )
+        .sort(); // Sort for consistent order
+
+      if (filteredModels.length > 0) {
+        console.log("Dynamically fetched and filtered models:", filteredModels);
+        return filteredModels;
+      }
+
+      console.warn(
+        "Dynamic fetching yielded no suitable models, returning fallback."
+      );
+      return FALLBACK_MODELS;
+    } catch (error) {
+      console.error(`Failed to fetch or filter OpenAI models: ${error}`);
+      console.warn("Returning fallback models due to error.");
+      return FALLBACK_MODELS;
     }
   }
 }
