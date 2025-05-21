@@ -204,13 +204,6 @@ export function getPrSummaryPanelHtml(
         </div>
 
         <div class="form-group">
-            <label for="sourceBranch">Source Branch:</label>
-            <vscode-dropdown id="sourceBranch">
-                <vscode-option value="">Loading branches...</vscode-option>
-            </vscode-dropdown>
-        </div>
-
-        <div class="form-group">
             <label for="targetBranch">Target Branch:</label>
             <vscode-dropdown id="targetBranch">
                 <vscode-option value="">Loading branches...</vscode-option>
@@ -318,7 +311,6 @@ export function getPrSummaryPanelHtml(
                 includeDiffsCheckbox: document.getElementById('includeDiffs'),
                 modelSelect: document.getElementById('model'),
                 templateSelect: document.getElementById('template'),
-                sourceBranchSelect: document.getElementById('sourceBranch'),
                 targetBranchSelect: document.getElementById('targetBranch'),
                 additionalPromptInput: document.getElementById('additionalPrompt'),
                 generateButton: document.getElementById('generateButton'),
@@ -395,7 +387,6 @@ export function getPrSummaryPanelHtml(
                     includeDiffs: elements.includeDiffsCheckbox.checked,
                     model: elements.modelSelect.value,
                     template: elements.templateSelect.value,
-                    sourceBranch: elements.sourceBranchSelect.value,
                     targetBranch: elements.targetBranchSelect.value
                     // JIRA details are read from config by the extension if needed
                 });
@@ -502,10 +493,9 @@ export function getPrSummaryPanelHtml(
             }
 
             function populateBranchDropdowns(branches, currentBranch) {
-                if (!elements.sourceBranchSelect || !elements.targetBranchSelect) return;
+                if (!elements.targetBranchSelect) return;
 
                 // Clear options
-                elements.sourceBranchSelect.innerHTML = '';
                 elements.targetBranchSelect.innerHTML = '';
 
                 // Add default empty option for target branch
@@ -516,21 +506,7 @@ export function getPrSummaryPanelHtml(
 
                 // Add branches
                 if (branches.length > 0) {
-                    // Always select the first branch for source (which is current branch)
-                    let isFirstBranch = true;
-                    
                     branches.forEach(branch => {
-                        const sourceOption = document.createElement('vscode-option');
-                        sourceOption.value = branch;
-                        sourceOption.textContent = branch;
-                        
-                        // If it's the first branch or matches current branch
-                        if (isFirstBranch || branch === currentBranch) {
-                            sourceOption.selected = true;
-                            isFirstBranch = false;
-                        }
-                        elements.sourceBranchSelect.appendChild(sourceOption);
-
                         const targetOption = document.createElement('vscode-option');
                         targetOption.value = branch;
                         targetOption.textContent = branch;
