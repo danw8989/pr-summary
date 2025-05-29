@@ -130,13 +130,39 @@ export class AutoPostService {
         };
       }
 
+      // Validate branches exist before creating PR
+      const branchValidation = await this.validateGitHubBranches(
+        token,
+        repoInfo,
+        sourceBranch,
+        targetBranch
+      );
+
+      if (!branchValidation.valid) {
+        return {
+          success: false,
+          error: branchValidation.error,
+          platform: "github",
+        };
+      }
+
       const isDraft = this.shouldCreateDraft(state, title, sourceBranch);
+
+      // Clean up branch names (remove origin/ prefix if present)
+      const cleanSourceBranch = sourceBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+      const cleanTargetBranch = targetBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
 
       const prData: PRCreateRequest = {
         title,
         body: summary,
-        head: sourceBranch,
-        base: targetBranch,
+        head: cleanSourceBranch,
+        base: cleanTargetBranch,
         draft: isDraft,
       };
 
@@ -155,12 +181,51 @@ export class AutoPostService {
       );
 
       if (!response.ok) {
-        const errorData = (await response.json()) as ErrorResponse;
+        let errorMessage = `GitHub API error (${response.status}): ${response.statusText}`;
+
+        try {
+          const errorData = (await response.json()) as any;
+
+          if (errorData.message) {
+            errorMessage = `GitHub API error: ${errorData.message}`;
+          }
+
+          // Provide specific error messages for common validation failures
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            const errorDetails = errorData.errors
+              .map((err: any) => {
+                if (err.field === "head" && err.code === "invalid") {
+                  return `Source branch "${cleanSourceBranch}" does not exist or is not accessible`;
+                }
+                if (err.field === "base" && err.code === "invalid") {
+                  return `Target branch "${cleanTargetBranch}" does not exist`;
+                }
+                if (err.message && err.message.includes("already exists")) {
+                  return `A pull request already exists for ${cleanSourceBranch} → ${cleanTargetBranch}`;
+                }
+                return err.message || `${err.field}: ${err.code}`;
+              })
+              .join("; ");
+
+            errorMessage += `. Details: ${errorDetails}`;
+          }
+
+          // Check for specific validation scenarios
+          if (response.status === 422) {
+            if (errorData.message?.includes("already exists")) {
+              errorMessage = `A pull request from "${cleanSourceBranch}" to "${cleanTargetBranch}" already exists`;
+            } else if (errorData.message?.includes("head sha")) {
+              errorMessage = `Source branch "${cleanSourceBranch}" is up to date with target branch "${cleanTargetBranch}" - no changes to merge`;
+            }
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, use the original message
+          console.log("Could not parse GitHub error response:", parseError);
+        }
+
         return {
           success: false,
-          error: `GitHub API error: ${
-            errorData.message || response.statusText
-          }`,
+          error: errorMessage,
           platform: "github",
         };
       }
@@ -178,6 +243,85 @@ export class AutoPostService {
           error instanceof Error ? error.message : String(error)
         }`,
         platform: "github",
+      };
+    }
+  }
+
+  /**
+   * Validate that branches exist on GitHub before creating PR
+   */
+  private async validateGitHubBranches(
+    token: string,
+    repoInfo: { owner: string; repo: string },
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Clean branch names
+      const cleanSourceBranch = sourceBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+      const cleanTargetBranch = targetBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+
+      // Check if source branch exists
+      const sourceResponse = await fetch(
+        `${GITHUB_API.BASE_URL}${GITHUB_API.ENDPOINTS.REPOS}/${repoInfo.owner}/${repoInfo.repo}/branches/${cleanSourceBranch}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        }
+      );
+
+      if (!sourceResponse.ok) {
+        if (sourceResponse.status === 404) {
+          return {
+            valid: false,
+            error: `Source branch "${cleanSourceBranch}" does not exist on GitHub. Make sure to push your branch first.`,
+          };
+        }
+        return {
+          valid: false,
+          error: `Could not verify source branch "${cleanSourceBranch}" (HTTP ${sourceResponse.status})`,
+        };
+      }
+
+      // Check if target branch exists
+      const targetResponse = await fetch(
+        `${GITHUB_API.BASE_URL}${GITHUB_API.ENDPOINTS.REPOS}/${repoInfo.owner}/${repoInfo.repo}/branches/${cleanTargetBranch}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        }
+      );
+
+      if (!targetResponse.ok) {
+        if (targetResponse.status === 404) {
+          return {
+            valid: false,
+            error: `Target branch "${cleanTargetBranch}" does not exist on GitHub`,
+          };
+        }
+        return {
+          valid: false,
+          error: `Could not verify target branch "${cleanTargetBranch}" (HTTP ${targetResponse.status})`,
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Branch validation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }
