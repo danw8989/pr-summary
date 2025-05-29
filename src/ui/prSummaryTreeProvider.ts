@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { TemplateManager } from "../utils/templateManager";
 
 export interface PrSummaryTreeItem {
   id: string;
@@ -26,10 +27,12 @@ export class PrSummaryTreeProvider
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
     this.initializeTree();
+    this.loadCustomTemplates();
   }
 
   refresh(): void {
     this.initializeTree();
+    this.loadCustomTemplates();
     this._onDidChangeTreeData.fire();
   }
 
@@ -209,6 +212,34 @@ export class PrSummaryTreeProvider
         ],
       },
       {
+        id: "customTemplates",
+        label: "Custom Templates",
+        iconPath: new vscode.ThemeIcon("file-text"),
+        contextValue: "customTemplatesSection",
+        children: [
+          {
+            id: "createCustomTemplate",
+            label: "Create New Template",
+            iconPath: new vscode.ThemeIcon("add"),
+            contextValue: "createCustomTemplate",
+            command: {
+              command: "prSummary.createCustomTemplate",
+              title: "Create Custom Template",
+            },
+          },
+          {
+            id: "templateInfo",
+            label: "Template Storage Info",
+            iconPath: new vscode.ThemeIcon("info"),
+            contextValue: "templateInfo",
+            command: {
+              command: "prSummary.showTemplateInfo",
+              title: "Show Template Info",
+            },
+          },
+        ],
+      },
+      {
         id: "history",
         label: "Recent Summaries",
         iconPath: new vscode.ThemeIcon("history"),
@@ -265,5 +296,55 @@ export class PrSummaryTreeProvider
       item.description = value;
       this._onDidChangeTreeData.fire();
     }
+  }
+
+  private async loadCustomTemplates(): Promise<void> {
+    const customTemplates = await TemplateManager.getCustomTemplates(
+      this._context
+    );
+    this.updateCustomTemplates(customTemplates);
+  }
+
+  updateCustomTemplates(templates: any[]): void {
+    const customTemplatesSection = this._data.find(
+      (item) => item.id === "customTemplates"
+    );
+    if (customTemplatesSection) {
+      customTemplatesSection.children = [
+        {
+          id: "createCustomTemplate",
+          label: "Create New Template",
+          iconPath: new vscode.ThemeIcon("add"),
+          contextValue: "createCustomTemplate",
+          command: {
+            command: "prSummary.createCustomTemplate",
+            title: "Create Custom Template",
+          },
+        },
+        {
+          id: "templateInfo",
+          label: "Template Storage Info",
+          iconPath: new vscode.ThemeIcon("info"),
+          contextValue: "templateInfo",
+          command: {
+            command: "prSummary.showTemplateInfo",
+            title: "Show Template Info",
+          },
+        },
+        ...templates.map((template, index) => ({
+          id: `customTemplate-${index}`,
+          label: template.name,
+          description: "Custom",
+          iconPath: new vscode.ThemeIcon("file-text"),
+          contextValue: "customTemplate",
+          command: {
+            command: "prSummary.editCustomTemplate",
+            title: "Edit Custom Template",
+            arguments: [template],
+          },
+        })),
+      ];
+    }
+    this._onDidChangeTreeData.fire();
   }
 }

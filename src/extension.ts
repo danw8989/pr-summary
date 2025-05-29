@@ -51,6 +51,16 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.setAdditionalPrompt", () =>
       commandsHandler.setAdditionalPrompt()
     ),
+    vscode.commands.registerCommand("prSummary.createCustomTemplate", () =>
+      commandsHandler.createCustomTemplate()
+    ),
+    vscode.commands.registerCommand(
+      "prSummary.editCustomTemplate",
+      (template) => commandsHandler.editCustomTemplate(template)
+    ),
+    vscode.commands.registerCommand("prSummary.showTemplateInfo", () =>
+      commandsHandler.showTemplateInfo()
+    ),
     vscode.commands.registerCommand("prSummary.selectTemplate", () =>
       commandsHandler.selectTemplate()
     ),

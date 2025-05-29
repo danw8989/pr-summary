@@ -7,6 +7,7 @@ Generate comprehensive PR summaries using OpenAI's models based on your Git comm
 - **Native VS Code Tree View**: Integrated seamlessly into VS Code's Activity Bar with familiar tree-based navigation
 - **Smart Branch Selection**: Choose both source and target branches with intelligent defaults (main/master/develop)
 - **Multiple Template Styles**: Choose from 12 professionally-crafted templates including general styles (Short, Medium, Long, Thorough) and specialized templates (Bug Fix, Feature Request, Documentation, Refactoring, Security Fix, Performance, Dependencies, Infrastructure)
+- **Custom Templates**: Create, edit, and manage your own custom templates with a built-in editor
 - **JIRA Integration**: Optional integration to link JIRA tickets to your PR summaries
 - **History Management**: View and reuse your previously generated PR summaries
 - **Native Document Display**: View results in VS Code's markdown editor with syntax highlighting
@@ -63,6 +64,12 @@ The extension adds a **PR Summary** icon to your Activity Bar (left sidebar). Cl
 2. Click any previous summary to view it in a new document
 3. Copy and reuse previous summaries as needed
 
+### Custom Templates
+
+- Create new custom templates with guided editor
+- Edit or delete existing custom templates
+- Templates appear in template selector alongside built-in options
+
 ## Configuration
 
 ### Extension Settings
@@ -96,6 +103,8 @@ Access these via Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 - `Select Source Branch` - Choose the branch to create PR from
 - `Select Target Branch` - Choose the target branch for comparison
 - `Select Template` - Choose summary template style
+- `Create Custom Template` - Create a new custom template
+- `Edit Custom Template` - Edit or delete existing custom templates
 
 ## How It Works
 
@@ -132,6 +141,12 @@ The extension provides a clean, organized tree view with three main sections:
 - Click to reopen any previous summary
 - Shows branch name, timestamp, and linked JIRA ticket
 
+### Custom Templates
+
+- Create new custom templates with guided editor
+- Edit or delete existing custom templates
+- Templates appear in template selector alongside built-in options
+
 ## Template Styles
 
 ### General Purpose Templates
@@ -153,6 +168,24 @@ The extension provides a clean, organized tree view with three main sections:
 - **Infrastructure**: DevOps and infrastructure changes with deployment considerations
 
 These templates are based on [industry best practices for GitHub pull request templates](https://axolo.co/blog/p/part-3-github-pull-request-template) and provide structured guidance for different types of changes.
+
+### Custom Templates
+
+Create your own templates tailored to your team's specific needs:
+
+1. **Create New Template**: Click "Create New Template" in the Custom Templates section
+2. **Template Editor**: Use the built-in markdown editor with guided instructions
+3. **Edit Templates**: Click any existing custom template to edit or delete it
+4. **Team-Specific**: Perfect for organization-specific workflows, compliance requirements, or specialized processes
+
+**Example Custom Template Use Cases:**
+
+- QA-focused templates requiring specific testing scenarios
+- Security review templates for sensitive changes
+- Compliance templates for regulated industries
+- Team-specific formatting and information requirements
+
+Custom templates integrate seamlessly with the existing workflow and appear alongside built-in templates in the template selector.
 
 ## Troubleshooting
 

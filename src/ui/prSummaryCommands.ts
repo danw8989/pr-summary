@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { GitHelper } from "../utils/gitHelper";
 import { JiraHelper } from "../utils/jiraHelper";
 import { OpenAIHelper } from "../utils/openAiHelper";
-import { TemplateManager } from "../utils/templateManager";
+import { TemplateManager, CustomTemplate } from "../utils/templateManager";
 import { HistoryManager } from "../utils/historyManager";
 import { PrSummaryTreeProvider } from "./prSummaryTreeProvider";
 import { PrSummaryResultProvider } from "./prSummaryResultsView";
@@ -257,6 +257,133 @@ export class PrSummaryCommands {
       );
 
       this._treeProvider.refresh();
+    }
+  }
+
+  async createCustomTemplate(): Promise<void> {
+    // Step 1: Get template name
+    const templateName = await vscode.window.showInputBox({
+      prompt: "Enter a name for your custom template",
+      placeHolder: "e.g., My Team Template, QA Process, etc.",
+      validateInput: async (value) => {
+        if (!value || value.trim().length === 0) {
+          return "Template name cannot be empty";
+        }
+
+        // Check if template name already exists
+        const existingTemplates = await TemplateManager.getAllTemplateOptions(
+          this._context
+        );
+        if (existingTemplates.includes(value.trim())) {
+          return "A template with this name already exists";
+        }
+
+        return null;
+      },
+      ignoreFocusOut: true,
+    });
+
+    if (!templateName) return;
+
+    // Step 2: Get template instructions using a large input box
+    const templateInstructions = await vscode.window.showInputBox({
+      prompt:
+        "Enter the AI instructions for your template (this tells the AI how to generate the PR summary)",
+      placeHolder:
+        "e.g., Generate a PR summary with focus on security changes. Include: risk assessment, mitigation steps, testing approach...",
+      ignoreFocusOut: true,
+      value: `Generate a PR summary for ${templateName} with the following structure:
+- Brief description of changes
+- Impact on [specify area: users, system, performance, etc.]
+- Testing approach and validation
+- Any special considerations or notes`,
+    });
+
+    if (!templateInstructions) return;
+
+    try {
+      // Save the template to VS Code's storage (not as a file)
+      await TemplateManager.saveCustomTemplate(
+        this._context,
+        templateName,
+        templateInstructions
+      );
+
+      vscode.window.showInformationMessage(
+        `✅ Custom template "${templateName}" saved successfully! It will appear in your template selector.`
+      );
+
+      // Refresh the tree view to show the new template
+      this._treeProvider.refresh();
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to save template: ${error}`);
+    }
+  }
+
+  async editCustomTemplate(template: CustomTemplate): Promise<void> {
+    const options = await vscode.window.showQuickPick(
+      [
+        {
+          label: "$(edit) Edit Template",
+          description: "Modify the template instructions",
+          action: "edit",
+        },
+        {
+          label: "$(trash) Delete Template",
+          description: "Remove this custom template",
+          action: "delete",
+        },
+      ],
+      {
+        placeHolder: `Choose action for template: ${template.name}`,
+        ignoreFocusOut: true,
+      }
+    );
+
+    if (!options) return;
+
+    if (options.action === "delete") {
+      const confirmation = await vscode.window.showWarningMessage(
+        `Are you sure you want to delete the template "${template.name}"?`,
+        "Delete",
+        "Cancel"
+      );
+
+      if (confirmation === "Delete") {
+        await TemplateManager.deleteCustomTemplate(
+          this._context,
+          template.name
+        );
+        vscode.window.showInformationMessage(
+          `✅ Template "${template.name}" deleted successfully`
+        );
+        this._treeProvider.refresh();
+      }
+    } else if (options.action === "edit") {
+      // Edit the template instructions directly
+      const newInstructions = await vscode.window.showInputBox({
+        prompt: `Edit instructions for template: ${template.name}`,
+        placeHolder: "Enter the AI instructions for generating PR summaries...",
+        value: template.prompt,
+        ignoreFocusOut: true,
+      });
+
+      if (newInstructions !== undefined) {
+        // Allow empty string
+        try {
+          await TemplateManager.saveCustomTemplate(
+            this._context,
+            template.name,
+            newInstructions
+          );
+          vscode.window.showInformationMessage(
+            `✅ Template "${template.name}" updated successfully!`
+          );
+          this._treeProvider.refresh();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update template: ${error}`);
+        }
+      }
     }
   }
 
@@ -626,6 +753,68 @@ export class PrSummaryCommands {
       quickPick.show();
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to load branches: ${error}`);
+    }
+  }
+
+  async showTemplateInfo(): Promise<void> {
+    const customTemplates = await TemplateManager.getCustomTemplates(
+      this._context
+    );
+
+    if (customTemplates.length === 0) {
+      vscode.window.showInformationMessage(
+        "You don't have any custom templates yet. Click 'Create New Template' to get started!"
+      );
+      return;
+    }
+
+    const templateList = customTemplates.map((t) => `• ${t.name}`).join("\n");
+
+    const options = await vscode.window.showInformationMessage(
+      `📝 You have ${customTemplates.length} custom template(s):\n\n${templateList}\n\n` +
+        `Templates are stored securely in VS Code's settings (not as files). ` +
+        `They will persist across VS Code sessions and sync with your settings if enabled.`,
+      "Export Templates",
+      "OK"
+    );
+
+    if (options === "Export Templates") {
+      // Create a document with all templates for export/backup
+      const exportContent = `# Custom PR Summary Templates Export
+Generated: ${new Date().toLocaleString()}
+
+${customTemplates
+  .map(
+    (template) => `
+## ${template.name}
+
+\`\`\`
+${template.prompt}
+\`\`\`
+`
+  )
+  .join("\n")}
+
+## Import Instructions
+To import these templates:
+1. Copy the template content (between backticks)
+2. Use "Create New Template" in the extension
+3. Paste the content as the template instructions
+`;
+
+      const document = await vscode.workspace.openTextDocument({
+        content: exportContent,
+        language: "markdown",
+      });
+
+      await vscode.window.showTextDocument(document, {
+        viewColumn: vscode.ViewColumn.One,
+        preview: false,
+      });
+
+      vscode.window.showInformationMessage(
+        "💾 Templates exported! Save this file to backup your templates."
+      );
     }
   }
 }

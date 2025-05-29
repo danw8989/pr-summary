@@ -2,7 +2,7 @@
   "name": "pr-summary",
   "displayName": "PR Summary",
   "description": "Generate PR summaries using OpenAI based on your Git commit history",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
@@ -79,6 +79,16 @@
         "icon": "$(edit)"
       },
       {
+        "command": "prSummary.createCustomTemplate",
+        "title": "Create Custom Template",
+        "icon": "$(add)"
+      },
+      {
+        "command": "prSummary.editCustomTemplate",
+        "title": "Edit Custom Template",
+        "icon": "$(edit)"
+      },
+      {
         "command": "prSummary.selectTemplate",
         "title": "Select Template",
         "icon": "$(file-text)"
@@ -144,6 +154,12 @@
         },
         {
           "command": "prSummary.selectTemplate"
+        },
+        {
+          "command": "prSummary.createCustomTemplate"
+        },
+        {
+          "command": "prSummary.editCustomTemplate"
         }
       ],
       "view/title": [
