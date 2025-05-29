@@ -269,4 +269,93 @@ export class GitHelper {
       return null;
     }
   }
+
+  /**
+   * Push a branch to the remote repository
+   */
+  static async pushBranch(
+    branchName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // First, check if we're on the correct branch
+      const currentBranch = await this.getCurrentBranchName();
+
+      if (currentBranch !== branchName) {
+        return {
+          success: false,
+          error: `Cannot push branch "${branchName}". Currently on branch "${currentBranch}". Please switch to the branch first.`,
+        };
+      }
+
+      // Check if there are any commits to push
+      try {
+        const { stdout: status } = await this.executeInWorkspaceRoot(
+          "git status -b --porcelain=v2"
+        );
+
+        // Look for ahead/behind information
+        const aheadMatch = status.match(/branch\.ab \+(\d+) -\d+/);
+        const aheadCount = aheadMatch ? parseInt(aheadMatch[1]) : 0;
+
+        if (aheadCount === 0) {
+          return {
+            success: false,
+            error: `Branch "${branchName}" is up to date with remote. No commits to push.`,
+          };
+        }
+      } catch (statusError) {
+        // If we can't determine status, continue with push attempt
+        console.log(
+          "Could not determine branch status, proceeding with push:",
+          statusError
+        );
+      }
+
+      // Attempt to push the branch
+      // Use --set-upstream in case this is the first push
+      const { stdout, stderr } = await this.executeInWorkspaceRoot(
+        `git push --set-upstream origin ${branchName}`
+      );
+
+      // Check if push was successful
+      if (stderr && stderr.includes("error:")) {
+        return {
+          success: false,
+          error: `Git push failed: ${stderr}`,
+        };
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      // Handle specific Git errors
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (
+        errorMessage.includes("permission denied") ||
+        errorMessage.includes("authentication failed")
+      ) {
+        return {
+          success: false,
+          error:
+            "Push failed: Authentication error. Please check your Git credentials.",
+        };
+      }
+
+      if (errorMessage.includes("rejected")) {
+        return {
+          success: false,
+          error:
+            "Push rejected: The remote branch has changes. Try pulling first.",
+        };
+      }
+
+      return {
+        success: false,
+        error: `Failed to push branch "${branchName}": ${errorMessage}`,
+      };
+    }
+  }
 }

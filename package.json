@@ -111,6 +111,11 @@
         "command": "prSummary.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "prSummary.manualPostPR",
+        "title": "Manual Post PR/MR",
+        "icon": "$(cloud-upload)"
       }
     ],
     "viewsContainers": {
@@ -174,6 +179,9 @@
         },
         {
           "command": "prSummary.editCustomTemplate"
+        },
+        {
+          "command": "prSummary.manualPostPR"
         }
       ],
       "view/title": [
@@ -217,6 +225,11 @@
         {
           "command": "pr-summary.generatePrSummary",
           "when": "view == prSummaryTree && viewItem == generateSummary",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.manualPostPR",
+          "when": "view == prSummaryTree && viewItem == manualPost",
           "group": "inline"
         }
       ],
