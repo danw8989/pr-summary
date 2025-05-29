@@ -1,8 +1,8 @@
 {
   "name": "pr-summary",
-  "displayName": "PR Summary",
-  "description": "Generate PR summaries using OpenAI based on your Git commit history",
-  "version": "0.2.1",
+  "displayName": "AI PR Summary Generator",
+  "description": "🚀 Automate PR summaries with AI! Generate professional pull request descriptions from Git commits using OpenAI. Includes 12 templates, JIRA integration, and auto-posting to GitHub/GitLab.",
+  "version": "0.2.2",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
@@ -10,16 +10,30 @@
     "vscode": "^1.96.2"
   },
   "categories": [
-    "Other",
-    "SCM Providers"
+    "SCM Providers",
+    "Machine Learning",
+    "Other"
   ],
   "keywords": [
+    "ai",
+    "openai",
     "git",
     "pull request",
     "pr",
     "summary",
-    "openai",
-    "jira"
+    "github",
+    "gitlab",
+    "jira",
+    "automation",
+    "productivity",
+    "code review",
+    "commit",
+    "documentation",
+    "changelog",
+    "merge request",
+    "scm",
+    "template",
+    "workflow"
   ],
   "activationEvents": [
     "onStartupFinished",
@@ -350,5 +364,27 @@
   "homepage": "https://github.com/danw8989/pr-summary",
   "bugs": {
     "url": "https://github.com/danw8989/pr-summary/issues"
-  }
+  },
+  "qna": "marketplace",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/v/InZarys.pr-summary",
+      "href": "https://marketplace.visualstudio.com/items?itemName=InZarys.pr-summary",
+      "description": "Version"
+    },
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/d/InZarys.pr-summary",
+      "href": "https://marketplace.visualstudio.com/items?itemName=InZarys.pr-summary",
+      "description": "Downloads"
+    },
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/r/InZarys.pr-summary",
+      "href": "https://marketplace.visualstudio.com/items?itemName=InZarys.pr-summary",
+      "description": "Rating"
+    }
+  ]
 }
