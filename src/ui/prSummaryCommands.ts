@@ -866,22 +866,40 @@ To import these templates:
     const token = await vscode.window.showInputBox({
       prompt: "Enter your GitHub Personal Access Token",
       password: true,
-      placeHolder: "ghp_...",
+      placeHolder: "ghp_... or github_pat_...",
       ignoreFocusOut: true,
       validateInput: (value) => {
         if (!value) return "Token is required";
-        if (!value.startsWith("ghp_") && !value.startsWith("github_pat_")) {
-          return "Invalid GitHub token format";
+
+        // Trim whitespace and check format
+        const trimmedValue = value.trim();
+        const validFormats = ["ghp_", "github_pat_", "ghs_", "gho_", "ghu_"];
+        const isValidFormat = validFormats.some((prefix) =>
+          trimmedValue.startsWith(prefix)
+        );
+
+        if (!isValidFormat) {
+          return `Invalid GitHub token format. Token should start with: ${validFormats.join(
+            ", "
+          )}`;
         }
+
+        // Check minimum length
+        if (trimmedValue.length < 10) {
+          return "Token appears to be too short";
+        }
+
         return null;
       },
     });
 
     if (token) {
+      // Trim the token before saving
+      const trimmedToken = token.trim();
       const config = vscode.workspace.getConfiguration("prSummary");
       await config.update(
         "github.token",
-        token,
+        trimmedToken,
         vscode.ConfigurationTarget.Global
       );
 
@@ -1082,6 +1100,158 @@ To import these templates:
       vscode.window.showErrorMessage(
         `❌ Failed to create PR/MR: ${result.error}`
       );
+    }
+  }
+
+  /**
+   * Manual PR/MR posting - allows users to manually create PR/MR with more control
+   */
+  async manualPostPR(): Promise<void> {
+    if (!this._selectedBranch) {
+      const result = await vscode.window.showWarningMessage(
+        "No branch selected. Would you like to select one now?",
+        "Select Branch",
+        "Cancel"
+      );
+      if (result === "Select Branch") {
+        await this.selectBranch();
+        if (!this._selectedBranch) return;
+      } else {
+        return;
+      }
+    }
+
+    if (!this._selectedTargetBranch) {
+      this._selectedTargetBranch = "main"; // Default fallback
+    }
+
+    // Get or generate title and summary
+    let title: string;
+    let summary: string;
+
+    const useExistingSummary = await vscode.window.showQuickPick(
+      [
+        "Use Last Generated Summary",
+        "Generate New Summary",
+        "Enter Custom Title & Description",
+      ],
+      {
+        placeHolder: "Choose PR/MR content source",
+        ignoreFocusOut: true,
+      }
+    );
+
+    if (!useExistingSummary) return;
+
+    if (useExistingSummary === "Use Last Generated Summary") {
+      const recentHistory = await this._historyManager.getHistory();
+      if (recentHistory.length === 0) {
+        vscode.window.showErrorMessage(
+          "No previous summary found. Please generate a summary first."
+        );
+        return;
+      }
+
+      const lastSummary = recentHistory[0];
+      title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
+      summary = lastSummary.summary;
+    } else if (useExistingSummary === "Generate New Summary") {
+      // Generate a new summary first
+      await this.generateSummary();
+
+      // Get the newly generated summary
+      const recentHistory = await this._historyManager.getHistory();
+      if (recentHistory.length === 0) {
+        vscode.window.showErrorMessage("Failed to generate summary.");
+        return;
+      }
+
+      const newSummary = recentHistory[0];
+      title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
+      summary = newSummary.summary;
+    } else {
+      // Custom title and description
+      const customTitle = await vscode.window.showInputBox({
+        prompt: "Enter PR/MR title",
+        placeHolder: `${this._selectedBranch} → ${this._selectedTargetBranch}`,
+        value: `${this._selectedBranch} → ${this._selectedTargetBranch}`,
+        ignoreFocusOut: true,
+      });
+
+      if (!customTitle) return;
+
+      const customSummary = await vscode.window.showInputBox({
+        prompt: "Enter PR/MR description",
+        placeHolder: "Describe the changes in this PR/MR...",
+        ignoreFocusOut: true,
+      });
+
+      if (!customSummary) return;
+
+      title = customTitle;
+      summary = customSummary;
+    }
+
+    // Create the PR/MR
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Creating PR/MR manually...",
+        cancellable: false,
+      },
+      async () => {
+        return await this._autoPostService.manualPost(
+          title,
+          summary,
+          this._selectedBranch!,
+          this._selectedTargetBranch!
+        );
+      }
+    );
+
+    if (result.success) {
+      const openAction = await vscode.window.showInformationMessage(
+        `✅ PR/MR created successfully on ${result.platform}!`,
+        "Open in Browser"
+      );
+
+      if (openAction === "Open in Browser" && result.url) {
+        vscode.env.openExternal(vscode.Uri.parse(result.url));
+      }
+    } else {
+      // Provide helpful error message and potential solutions
+      const errorMessage = `❌ Failed to create PR/MR: ${result.error}`;
+
+      if (
+        result.error?.includes("push") ||
+        result.error?.includes("does not exist")
+      ) {
+        const retryWithPush = await vscode.window.showErrorMessage(
+          errorMessage,
+          "Try Again",
+          "Check Branch Status"
+        );
+
+        if (retryWithPush === "Try Again") {
+          // Retry the manual post
+          await this.manualPostPR();
+        } else if (retryWithPush === "Check Branch Status") {
+          // Show some helpful commands
+          const action = await vscode.window.showInformationMessage(
+            "Common solutions:\n• Make sure your branch is pushed to remote\n• Check that branch names are correct\n• Verify your GitHub/GitLab token permissions",
+            "Open Terminal",
+            "Refresh Branches"
+          );
+
+          if (action === "Open Terminal") {
+            vscode.commands.executeCommand("workbench.action.terminal.new");
+          } else if (action === "Refresh Branches") {
+            await this.selectBranch();
+          }
+        }
+      } else {
+        vscode.window.showErrorMessage(errorMessage);
+      }
     }
   }
 }

@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { JiraHelper, JiraTicket } from "../utils/jiraHelper";
-import { PrSummaryPanel } from "./prSummaryPanel";
 
 export class JiraTicketSelector {
   // Store the selected ticket for this instance
@@ -99,12 +98,14 @@ export class JiraTicketSelector {
             );
 
             if (response === openPRSummary) {
-              // Open PR Summary with selected ticket using instance context
-              PrSummaryPanel.createOrShow(
-                this._context.extensionUri,
-                this._context,
+              // Store the selected ticket in global state for use in PR summary generation
+              await this._context.globalState.update(
+                "selectedJiraTicket",
                 formattedTicket
               );
+
+              // Execute the PR summary command which now uses native UI
+              await vscode.commands.executeCommand("pr-summary.generate");
             }
           }
         } catch (error) {

@@ -91,6 +91,9 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.selectAutoPostState", () =>
       commandsHandler.selectAutoPostState()
     ),
+    vscode.commands.registerCommand("prSummary.manualPostPR", () =>
+      commandsHandler.manualPostPR()
+    ),
   ];
 
   context.subscriptions.push(...commands);

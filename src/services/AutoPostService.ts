@@ -130,13 +130,39 @@ export class AutoPostService {
         };
       }
 
+      // Validate branches exist before creating PR
+      const branchValidation = await this.validateGitHubBranches(
+        token,
+        repoInfo,
+        sourceBranch,
+        targetBranch
+      );
+
+      if (!branchValidation.valid) {
+        return {
+          success: false,
+          error: branchValidation.error,
+          platform: "github",
+        };
+      }
+
       const isDraft = this.shouldCreateDraft(state, title, sourceBranch);
+
+      // Clean up branch names (remove origin/ prefix if present)
+      const cleanSourceBranch = sourceBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+      const cleanTargetBranch = targetBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
 
       const prData: PRCreateRequest = {
         title,
         body: summary,
-        head: sourceBranch,
-        base: targetBranch,
+        head: cleanSourceBranch,
+        base: cleanTargetBranch,
         draft: isDraft,
       };
 
@@ -155,12 +181,51 @@ export class AutoPostService {
       );
 
       if (!response.ok) {
-        const errorData = (await response.json()) as ErrorResponse;
+        let errorMessage = `GitHub API error (${response.status}): ${response.statusText}`;
+
+        try {
+          const errorData = (await response.json()) as any;
+
+          if (errorData.message) {
+            errorMessage = `GitHub API error: ${errorData.message}`;
+          }
+
+          // Provide specific error messages for common validation failures
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            const errorDetails = errorData.errors
+              .map((err: any) => {
+                if (err.field === "head" && err.code === "invalid") {
+                  return `Source branch "${cleanSourceBranch}" does not exist or is not accessible`;
+                }
+                if (err.field === "base" && err.code === "invalid") {
+                  return `Target branch "${cleanTargetBranch}" does not exist`;
+                }
+                if (err.message && err.message.includes("already exists")) {
+                  return `A pull request already exists for ${cleanSourceBranch} → ${cleanTargetBranch}`;
+                }
+                return err.message || `${err.field}: ${err.code}`;
+              })
+              .join("; ");
+
+            errorMessage += `. Details: ${errorDetails}`;
+          }
+
+          // Check for specific validation scenarios
+          if (response.status === 422) {
+            if (errorData.message?.includes("already exists")) {
+              errorMessage = `A pull request from "${cleanSourceBranch}" to "${cleanTargetBranch}" already exists`;
+            } else if (errorData.message?.includes("head sha")) {
+              errorMessage = `Source branch "${cleanSourceBranch}" is up to date with target branch "${cleanTargetBranch}" - no changes to merge`;
+            }
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, use the original message
+          console.log("Could not parse GitHub error response:", parseError);
+        }
+
         return {
           success: false,
-          error: `GitHub API error: ${
-            errorData.message || response.statusText
-          }`,
+          error: errorMessage,
           platform: "github",
         };
       }
@@ -178,6 +243,163 @@ export class AutoPostService {
           error instanceof Error ? error.message : String(error)
         }`,
         platform: "github",
+      };
+    }
+  }
+
+  /**
+   * Validate that branches exist on GitHub before creating PR
+   */
+  private async validateGitHubBranches(
+    token: string,
+    repoInfo: { owner: string; repo: string },
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Clean branch names
+      const cleanSourceBranch = sourceBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+      const cleanTargetBranch = targetBranch.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+
+      // Check if source branch exists
+      const sourceResponse = await fetch(
+        `${GITHUB_API.BASE_URL}${GITHUB_API.ENDPOINTS.REPOS}/${repoInfo.owner}/${repoInfo.repo}/branches/${cleanSourceBranch}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        }
+      );
+
+      if (!sourceResponse.ok) {
+        if (sourceResponse.status === 404) {
+          // Check if the branch exists locally
+          const localBranchExists = await this.checkLocalBranchExists(
+            cleanSourceBranch
+          );
+
+          if (localBranchExists) {
+            // Offer to push the branch
+            const shouldPush = await vscode.window.showWarningMessage(
+              `Branch "${cleanSourceBranch}" exists locally but not on GitHub. Would you like to push it first?`,
+              "Push Branch",
+              "Cancel"
+            );
+
+            if (shouldPush === "Push Branch") {
+              const pushResult = await this.pushBranch(cleanSourceBranch);
+              if (pushResult.success) {
+                vscode.window.showInformationMessage(
+                  `✅ Branch "${cleanSourceBranch}" pushed successfully!`
+                );
+                return { valid: true }; // Branch is now available remotely
+              } else {
+                return {
+                  valid: false,
+                  error: `Failed to push branch "${cleanSourceBranch}": ${pushResult.error}`,
+                };
+              }
+            } else {
+              return {
+                valid: false,
+                error: `Branch "${cleanSourceBranch}" needs to be pushed to GitHub first.`,
+              };
+            }
+          } else {
+            return {
+              valid: false,
+              error: `Source branch "${cleanSourceBranch}" does not exist locally or on GitHub.`,
+            };
+          }
+        }
+        return {
+          valid: false,
+          error: `Could not verify source branch "${cleanSourceBranch}" (HTTP ${sourceResponse.status})`,
+        };
+      }
+
+      // Check if target branch exists
+      const targetResponse = await fetch(
+        `${GITHUB_API.BASE_URL}${GITHUB_API.ENDPOINTS.REPOS}/${repoInfo.owner}/${repoInfo.repo}/branches/${cleanTargetBranch}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+          },
+        }
+      );
+
+      if (!targetResponse.ok) {
+        if (targetResponse.status === 404) {
+          return {
+            valid: false,
+            error: `Target branch "${cleanTargetBranch}" does not exist on GitHub`,
+          };
+        }
+        return {
+          valid: false,
+          error: `Could not verify target branch "${cleanTargetBranch}" (HTTP ${targetResponse.status})`,
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Branch validation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
+  }
+
+  /**
+   * Check if a branch exists locally
+   */
+  private async checkLocalBranchExists(branchName: string): Promise<boolean> {
+    try {
+      const branches = await GitHelper.getAllBranches();
+      return branches.some(
+        (branch) =>
+          branch === branchName ||
+          branch === `origin/${branchName}` ||
+          branch === `remotes/origin/${branchName}`
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Push a branch to remote
+   */
+  private async pushBranch(
+    branchName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Pushing branch "${branchName}"...`,
+          cancellable: false,
+        },
+        async () => {
+          return await GitHelper.pushBranch(branchName);
+        }
+      );
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
@@ -569,5 +791,155 @@ export class AutoPostService {
         }`,
       };
     }
+  }
+
+  /**
+   * Manual PR/MR posting - can be used independently of auto-post
+   */
+  async manualPost(
+    title: string,
+    summary: string,
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<AutoPostResult> {
+    try {
+      // Let user choose platform if multiple are available
+      const platform = await this.selectPlatform();
+
+      if (!platform) {
+        return {
+          success: false,
+          error: "No platform selected",
+          platform: "github",
+        };
+      }
+
+      // Let user choose draft state
+      const state = await this.selectPRState();
+
+      if (platform === "github") {
+        return await this.postToGitHub(
+          title,
+          summary,
+          sourceBranch,
+          targetBranch,
+          state
+        );
+      } else if (platform === "gitlab") {
+        return await this.postToGitLab(
+          title,
+          summary,
+          sourceBranch,
+          targetBranch,
+          state
+        );
+      } else {
+        return {
+          success: false,
+          error: "Invalid platform selected",
+          platform: "github",
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Manual post failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        platform: "github",
+      };
+    }
+  }
+
+  /**
+   * Let user select platform for manual posting
+   */
+  private async selectPlatform(): Promise<AutoPostPlatform | null> {
+    // First try to auto-detect
+    const detectedPlatform = await this.detectPlatform();
+
+    if (detectedPlatform) {
+      // If we can detect the platform, ask for confirmation
+      const confirm = await vscode.window.showQuickPick(
+        [
+          {
+            label: `✅ ${
+              detectedPlatform.charAt(0).toUpperCase() +
+              detectedPlatform.slice(1)
+            }`,
+            detail: `Detected from Git remote URL`,
+            value: detectedPlatform,
+          },
+          {
+            label: "Choose Different Platform",
+            detail: "Select a different platform manually",
+            value: "choose",
+          },
+        ],
+        {
+          placeHolder: "Select platform for PR/MR",
+          ignoreFocusOut: true,
+        }
+      );
+
+      if (!confirm) return null;
+
+      if (confirm.value !== "choose") {
+        return confirm.value as AutoPostPlatform;
+      }
+    }
+
+    // Manual selection
+    const platformChoice = await vscode.window.showQuickPick(
+      [
+        {
+          label: "GitHub",
+          detail: "Create Pull Request on GitHub",
+          value: "github" as AutoPostPlatform,
+        },
+        {
+          label: "GitLab",
+          detail: "Create Merge Request on GitLab",
+          value: "gitlab" as AutoPostPlatform,
+        },
+      ],
+      {
+        placeHolder: "Select platform for PR/MR",
+        ignoreFocusOut: true,
+      }
+    );
+
+    return platformChoice?.value || null;
+  }
+
+  /**
+   * Let user select PR/MR state
+   */
+  private async selectPRState(): Promise<AutoPostState> {
+    const stateChoice = await vscode.window.showQuickPick(
+      [
+        {
+          label: "Ready for Review",
+          detail: "Create PR/MR ready for review",
+          value: "ready" as AutoPostState,
+        },
+        {
+          label: "Draft",
+          detail: "Create as draft PR/MR",
+          value: "draft" as AutoPostState,
+        },
+        {
+          label: "Auto-detect",
+          detail: "Detect from branch name or title keywords",
+          value: "auto" as AutoPostState,
+        },
+      ],
+      {
+        placeHolder: "Select PR/MR state",
+        ignoreFocusOut: true,
+      }
+    );
+
+    return stateChoice?.value || "ready";
   }
 }
