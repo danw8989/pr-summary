@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
+import { HistoryManager } from "../utils/historyManager";
 import { TemplateManager } from "../utils/templateManager";
+import { getMaskedConfigurationStatus } from "../utils/securityHelper";
 
 export interface PrSummaryTreeItem {
   id: string;
@@ -66,12 +68,15 @@ export class PrSummaryTreeProvider
 
   private initializeTree(): void {
     const config = vscode.workspace.getConfiguration("prSummary");
-    const hasApiKey =
+    const openaiApiKey =
       config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
-    const hasJiraConfig =
-      (config.get<string>("jiraUrl") || process.env.JIRA_URL) &&
-      (config.get<string>("jiraEmail") || process.env.JIRA_EMAIL) &&
-      (config.get<string>("jiraApiToken") || process.env.JIRA_API_TOKEN);
+    const hasApiKey = !!openaiApiKey;
+
+    const jiraUrl = config.get<string>("jiraUrl") || process.env.JIRA_URL;
+    const jiraEmail = config.get<string>("jiraEmail") || process.env.JIRA_EMAIL;
+    const jiraApiToken =
+      config.get<string>("jiraApiToken") || process.env.JIRA_API_TOKEN;
+    const hasJiraConfig = !!(jiraUrl && jiraEmail && jiraApiToken);
 
     const includeDiffs = config.get<boolean>("includeDiffs", true);
     const additionalPrompt = config.get<string>("additionalPrompt", "");
@@ -97,9 +102,8 @@ export class PrSummaryTreeProvider
         children: [
           {
             id: "apiKeyStatus",
-            label: hasApiKey
-              ? "OpenAI API Key: Configured"
-              : "OpenAI API Key: Not Set",
+            label: "OpenAI API Key",
+            description: getMaskedConfigurationStatus(openaiApiKey),
             iconPath: new vscode.ThemeIcon(hasApiKey ? "check" : "warning"),
             contextValue: "apiKey",
             command: !hasApiKey
@@ -111,7 +115,12 @@ export class PrSummaryTreeProvider
           },
           {
             id: "jiraStatus",
-            label: hasJiraConfig ? "JIRA: Configured" : "JIRA: Not Configured",
+            label: "JIRA Configuration",
+            description: hasJiraConfig
+              ? `URL: ${getMaskedConfigurationStatus(
+                  jiraUrl
+                )}, Token: ${getMaskedConfigurationStatus(jiraApiToken)}`
+              : "Not configured",
             iconPath: new vscode.ThemeIcon(hasJiraConfig ? "check" : "info"),
             contextValue: "jiraConfig",
             command: !hasJiraConfig
@@ -248,8 +257,8 @@ export class PrSummaryTreeProvider
           },
           {
             id: "configureGitHub",
-            label: "Configure GitHub Token",
-            description: githubToken ? "Configured" : "Not configured",
+            label: "GitHub Token",
+            description: getMaskedConfigurationStatus(githubToken),
             iconPath: new vscode.ThemeIcon("mark-github"),
             contextValue: "configureGitHub",
             command: {
@@ -259,8 +268,8 @@ export class PrSummaryTreeProvider
           },
           {
             id: "configureGitLab",
-            label: "Configure GitLab Token",
-            description: gitlabToken ? "Configured" : "Not configured",
+            label: "GitLab Token",
+            description: getMaskedConfigurationStatus(gitlabToken),
             iconPath: new vscode.ThemeIcon("gitlab"),
             contextValue: "configureGitLab",
             command: {

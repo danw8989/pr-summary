@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { HistoryManager, PrSummaryHistoryEntry } from "../utils/historyManager";
-import { PrSummaryPanel } from "./prSummaryPanel";
 
 /**
  * Provider for the PR Summary Actions view
@@ -103,7 +102,7 @@ export class PRSummaryHistoryProvider
   }
 
   /**
-   * View a history item in a WebView panel
+   * View a history item using native VSCode UI
    */
   public async viewHistoryItem(entry: PrSummaryHistoryEntry) {
     // Create quick pick items
