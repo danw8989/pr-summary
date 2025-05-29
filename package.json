@@ -69,6 +69,16 @@
         "icon": "$(git-merge)"
       },
       {
+        "command": "prSummary.toggleDiffs",
+        "title": "Toggle Include Code Diffs",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "prSummary.setAdditionalPrompt",
+        "title": "Set Additional Prompt Instructions",
+        "icon": "$(edit)"
+      },
+      {
         "command": "prSummary.selectTemplate",
         "title": "Select Template",
         "icon": "$(file-text)"
@@ -122,6 +132,15 @@
         },
         {
           "command": "prSummary.selectBranch"
+        },
+        {
+          "command": "prSummary.selectTargetBranch"
+        },
+        {
+          "command": "prSummary.toggleDiffs"
+        },
+        {
+          "command": "prSummary.setAdditionalPrompt"
         },
         {
           "command": "prSummary.selectTemplate"
@@ -226,6 +245,16 @@
             "Thorough"
           ],
           "description": "Default template style for PR summaries"
+        },
+        "prSummary.includeDiffs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include code diffs in addition to commit messages when generating PR summaries"
+        },
+        "prSummary.additionalPrompt": {
+          "type": "string",
+          "default": "",
+          "description": "Additional custom instructions to append to the default prompt (e.g., 'Focus on UI changes', 'Include performance implications')"
         }
       }
     }

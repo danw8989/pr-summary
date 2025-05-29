@@ -45,6 +45,12 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.selectTargetBranch", () =>
       commandsHandler.selectTargetBranch()
     ),
+    vscode.commands.registerCommand("prSummary.toggleDiffs", () =>
+      commandsHandler.toggleDiffs()
+    ),
+    vscode.commands.registerCommand("prSummary.setAdditionalPrompt", () =>
+      commandsHandler.setAdditionalPrompt()
+    ),
     vscode.commands.registerCommand("prSummary.selectTemplate", () =>
       commandsHandler.selectTemplate()
     ),

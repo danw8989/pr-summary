@@ -66,6 +66,9 @@ export class PrSummaryTreeProvider
       (config.get<string>("jiraEmail") || process.env.JIRA_EMAIL) &&
       (config.get<string>("jiraApiToken") || process.env.JIRA_API_TOKEN);
 
+    const includeDiffs = config.get<boolean>("includeDiffs", true);
+    const additionalPrompt = config.get<string>("additionalPrompt", "");
+
     this._data = [
       {
         id: "configuration",
@@ -170,6 +173,38 @@ export class PrSummaryTreeProvider
                   title: "Generate Summary",
                 }
               : undefined,
+          },
+        ],
+      },
+      {
+        id: "options",
+        label: "Generation Options",
+        iconPath: new vscode.ThemeIcon("settings-gear"),
+        contextValue: "optionsSection",
+        children: [
+          {
+            id: "toggleDiffs",
+            label: "Include Code Diffs",
+            description: includeDiffs ? "Enabled" : "Disabled",
+            iconPath: new vscode.ThemeIcon(
+              includeDiffs ? "check" : "circle-slash"
+            ),
+            contextValue: "toggleDiffs",
+            command: {
+              command: "prSummary.toggleDiffs",
+              title: "Toggle Include Diffs",
+            },
+          },
+          {
+            id: "setAdditionalPrompt",
+            label: "Custom Prompt Instructions",
+            description: additionalPrompt ? "Set" : "None",
+            iconPath: new vscode.ThemeIcon("edit"),
+            contextValue: "setAdditionalPrompt",
+            command: {
+              command: "prSummary.setAdditionalPrompt",
+              title: "Set Additional Prompt",
+            },
           },
         ],
       },

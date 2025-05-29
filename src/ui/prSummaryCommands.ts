@@ -213,6 +213,53 @@ export class PrSummaryCommands {
     );
   }
 
+  async toggleDiffs(): Promise<void> {
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const currentValue = config.get<boolean>("includeDiffs", true);
+
+    await config.update(
+      "includeDiffs",
+      !currentValue,
+      vscode.ConfigurationTarget.Global
+    );
+
+    vscode.window.showInformationMessage(
+      `Code diffs ${!currentValue ? "enabled" : "disabled"} for PR summaries`
+    );
+
+    this._treeProvider.refresh();
+  }
+
+  async setAdditionalPrompt(): Promise<void> {
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const currentPrompt = config.get<string>("additionalPrompt", "");
+
+    const newPrompt = await vscode.window.showInputBox({
+      prompt: "Enter additional instructions for PR summary generation",
+      placeHolder:
+        "e.g., Focus on UI changes, Include performance implications",
+      value: currentPrompt,
+      ignoreFocusOut: true,
+    });
+
+    if (newPrompt !== undefined) {
+      // Allow empty string to clear
+      await config.update(
+        "additionalPrompt",
+        newPrompt,
+        vscode.ConfigurationTarget.Global
+      );
+
+      vscode.window.showInformationMessage(
+        newPrompt
+          ? "Additional prompt instructions saved"
+          : "Additional prompt instructions cleared"
+      );
+
+      this._treeProvider.refresh();
+    }
+  }
+
   async selectBranch(): Promise<void> {
     try {
       const branches = await GitHelper.getAllBranches();
@@ -384,11 +431,15 @@ export class PrSummaryCommands {
             increment: 10,
             message: "Getting commit history...",
           });
+
+          const config = vscode.workspace.getConfiguration("prSummary");
+          const includeDiffs = config.get<boolean>("includeDiffs", true);
+
           const commitMessagesWithDiff =
             await GitHelper.getCommitMessagesWithDiff(
               this._selectedBranch!,
               this._selectedTargetBranch || "main",
-              true
+              includeDiffs
             );
 
           if (token.isCancellationRequested) return;
@@ -398,7 +449,6 @@ export class PrSummaryCommands {
             message: "Generating AI summary...",
           });
 
-          const config = vscode.workspace.getConfiguration("prSummary");
           const apiKey =
             config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
           const model = config.get<string>("defaultModel", "gpt-4");
@@ -410,8 +460,11 @@ export class PrSummaryCommands {
           const templatePrompts = await TemplateManager.getAllTemplatePrompts(
             this._context
           );
-          const additionalPrompt =
-            templatePrompts[this._selectedTemplate!] || "";
+          const templatePrompt = templatePrompts[this._selectedTemplate!] || "";
+          const customPrompt = config.get<string>("additionalPrompt", "");
+          const additionalPrompt = [templatePrompt, customPrompt]
+            .filter(Boolean)
+            .join(" ");
 
           const result = await OpenAIHelper.generatePrSummary(
             apiKey,
