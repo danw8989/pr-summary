@@ -31,34 +31,52 @@
       {
         "command": "pr-summary.generatePrSummary",
         "title": "PR Summary: Generate PR Summary",
-        "icon": {
-          "light": "media/pr-summary.png",
-          "dark": "media/pr-summary.png"
-        }
+        "icon": "$(play)"
       },
       {
         "command": "pr-summary.viewHistory",
         "title": "PR Summary: View History",
-        "icon": {
-          "light": "media/pr-summary.png",
-          "dark": "media/pr-summary.png"
-        }
-      },
-      {
-        "command": "pr-summary.viewHistoryItem",
-        "title": "PR Summary: View History Item",
-        "icon": {
-          "light": "media/pr-summary.png",
-          "dark": "media/pr-summary.png"
-        }
+        "icon": "$(history)"
       },
       {
         "command": "pr-summary.selectJiraTicket",
         "title": "PR Summary: Select JIRA Ticket",
-        "icon": {
-          "light": "media/pr-summary.png",
-          "dark": "media/pr-summary.png"
-        }
+        "icon": "$(link)"
+      },
+      {
+        "command": "prSummary.configureApiKey",
+        "title": "Configure OpenAI API Key",
+        "icon": "$(key)"
+      },
+      {
+        "command": "prSummary.configureJira",
+        "title": "Configure JIRA",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "prSummary.openSettings",
+        "title": "Open Extension Settings",
+        "icon": "$(settings)"
+      },
+      {
+        "command": "prSummary.selectBranch",
+        "title": "Select Source Branch",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "prSummary.selectTargetBranch",
+        "title": "Select Target Branch",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "prSummary.selectTemplate",
+        "title": "Select Template",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "prSummary.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -66,30 +84,23 @@
         {
           "id": "pr-summary-container",
           "title": "PR Summary",
-          "icon": "media/pr-summary.png"
+          "icon": "$(git-pull-request)"
         }
       ]
     },
     "views": {
       "pr-summary-container": [
         {
-          "id": "pr-summary-actions",
-          "name": "Actions"
-        },
-        {
-          "id": "pr-summary-history",
-          "name": "History"
+          "id": "prSummaryTree",
+          "name": "PR Summary Generator",
+          "visibility": "visible"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "pr-summary-actions",
-        "contents": "Generate PR summaries based on your Git commit history.\n[Generate PR Summary](command:pr-summary.generatePrSummary)\n[Select JIRA Ticket](command:pr-summary.selectJiraTicket)"
-      },
-      {
-        "view": "pr-summary-history",
-        "contents": "View your previously generated PR summaries.\n[View History](command:pr-summary.viewHistory)"
+        "view": "prSummaryTree",
+        "contents": "Generate PR summaries based on your Git commit history.\n\n[Configure OpenAI API Key](command:prSummary.configureApiKey)\n[Configure JIRA](command:prSummary.configureJira)\n\nOnce configured, you can:\n• Select a source branch\n• Choose a template\n• Generate summaries\n• View history"
       }
     ],
     "menus": {
@@ -102,23 +113,62 @@
         },
         {
           "command": "pr-summary.selectJiraTicket"
+        },
+        {
+          "command": "prSummary.configureApiKey"
+        },
+        {
+          "command": "prSummary.configureJira"
+        },
+        {
+          "command": "prSummary.selectBranch"
+        },
+        {
+          "command": "prSummary.selectTemplate"
         }
       ],
       "view/title": [
         {
-          "command": "pr-summary.generatePrSummary",
-          "when": "view == pr-summary-actions",
+          "command": "prSummary.refresh",
+          "when": "view == prSummaryTree",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "prSummary.configureApiKey",
+          "when": "view == prSummaryTree && viewItem == apiKey",
+          "group": "inline"
         },
         {
-          "command": "pr-summary.viewHistory",
-          "when": "view == pr-summary-history",
-          "group": "navigation"
+          "command": "prSummary.configureJira",
+          "when": "view == prSummaryTree && viewItem == jiraConfig",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.openSettings",
+          "when": "view == prSummaryTree && viewItem == openSettings",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.selectBranch",
+          "when": "view == prSummaryTree && viewItem == selectBranch",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.selectTemplate",
+          "when": "view == prSummaryTree && viewItem == selectTemplate",
+          "group": "inline"
         },
         {
           "command": "pr-summary.selectJiraTicket",
-          "when": "view == pr-summary-actions",
-          "group": "1_generation"
+          "when": "view == prSummaryTree && viewItem == selectJira",
+          "group": "inline"
+        },
+        {
+          "command": "pr-summary.generatePrSummary",
+          "when": "view == prSummaryTree && viewItem == generateSummary",
+          "group": "inline"
         }
       ],
       "editor/title": [
