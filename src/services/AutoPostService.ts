@@ -212,6 +212,7 @@ export class AutoPostService {
         };
       }
 
+      const apiBaseUrl = await this.getGitLabApiBaseUrl();
       const isDraft = this.shouldCreateDraft(state, title, sourceBranch);
 
       const mrData: MRCreateRequest = {
@@ -223,7 +224,7 @@ export class AutoPostService {
       };
 
       const response = await fetch(
-        `${GITLAB_API.BASE_URL}${GITLAB_API.ENDPOINTS.PROJECTS}/${projectId}${GITLAB_API.ENDPOINTS.MERGE_REQUESTS}`,
+        `${apiBaseUrl}${GITLAB_API.ENDPOINTS.PROJECTS}/${projectId}${GITLAB_API.ENDPOINTS.MERGE_REQUESTS}`,
         {
           method: "POST",
           headers: {
@@ -274,7 +275,8 @@ export class AutoPostService {
         return "github";
       } else if (
         remoteUrl.includes("gitlab.com") ||
-        remoteUrl.includes("gitlab.")
+        remoteUrl.includes("gitlab.") ||
+        this.isGitLabInstance(remoteUrl)
       ) {
         return "gitlab";
       }
@@ -282,6 +284,52 @@ export class AutoPostService {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Check if URL appears to be a GitLab instance
+   */
+  private isGitLabInstance(remoteUrl: string): boolean {
+    // Common patterns for GitLab instances
+    const gitlabPatterns = [
+      /gitlab\./i,
+      /git\..*\..*\/.*\/.*$/i, // git.company.com/group/project pattern
+      /-git\./i,
+      /\/gitlab\//i,
+    ];
+
+    return gitlabPatterns.some((pattern) => pattern.test(remoteUrl));
+  }
+
+  /**
+   * Get GitLab API base URL for the current repository
+   */
+  private async getGitLabApiBaseUrl(): Promise<string> {
+    try {
+      const remoteUrl = await GitHelper.getRemoteUrl();
+      if (!remoteUrl) return GITLAB_API.BASE_URL;
+
+      // If it's gitlab.com, use the default
+      if (remoteUrl.includes("gitlab.com")) {
+        return GITLAB_API.BASE_URL;
+      }
+
+      // For custom GitLab instances, extract the domain
+      const patterns = [/https?:\/\/([^\/]+)/, /git@([^:]+):/];
+
+      for (const pattern of patterns) {
+        const match = remoteUrl.match(pattern);
+        if (match) {
+          const domain = match[1];
+          return `https://${domain}/api/v4`;
+        }
+      }
+
+      // Fallback to default
+      return GITLAB_API.BASE_URL;
+    } catch {
+      return GITLAB_API.BASE_URL;
     }
   }
 
@@ -490,8 +538,10 @@ export class AutoPostService {
           return { success: false, error: "No GitLab token configured" };
         }
 
+        const apiBaseUrl = await this.getGitLabApiBaseUrl();
+
         const response = await fetch(
-          `${GITLAB_API.BASE_URL}${GITLAB_API.ENDPOINTS.USER}`,
+          `${apiBaseUrl}${GITLAB_API.ENDPOINTS.USER}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

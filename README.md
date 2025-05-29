@@ -103,9 +103,12 @@ The extension adds a **PR Summary** icon to your Activity Bar (left sidebar). Cl
 
 #### GitLab Setup
 
+**Supports both GitLab.com and self-hosted/enterprise GitLab instances**
+
 1. **Generate Personal Access Token**:
 
-   - Go to GitLab Settings > Access Tokens
+   - **For GitLab.com**: Go to GitLab Settings > Access Tokens
+   - **For self-hosted GitLab**: Go to your GitLab instance > Settings > Access Tokens
    - Create token with `api` scope
    - Copy the token (starts with `glpat-`)
 
@@ -114,6 +117,12 @@ The extension adds a **PR Summary** icon to your Activity Bar (left sidebar). Cl
    - Expand "Auto-Post Settings"
    - Click "Configure GitLab Token"
    - Paste your token and save
+
+**Note**: The extension automatically detects your GitLab instance URL from your git remote and uses the appropriate API endpoint. Works with:
+
+- GitLab.com (gitlab.com)
+- Self-hosted GitLab instances (git.company.com, gitlab.company.com, etc.)
+- GitLab Enterprise with custom domains
 
 ### Usage
 
@@ -128,6 +137,8 @@ The extension adds a **PR Summary** icon to your Activity Bar (left sidebar). Cl
 ### Auto-Detection Features
 
 - **Platform Detection**: Automatically detects GitHub vs GitLab from your git remote URL
+  - **GitHub**: Always github.com
+  - **GitLab**: Supports gitlab.com and custom/self-hosted instances
 - **Branch Patterns**: Auto-detects draft state from branch names like:
   - `draft/feature-name`
   - `wip/work-in-progress`

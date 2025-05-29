@@ -89,7 +89,7 @@ export const GITHUB_API = {
 
 // GitLab API constants
 export const GITLAB_API = {
-  BASE_URL: "https://gitlab.com/api/v4",
+  BASE_URL: "https://gitlab.com/api/v4", // Default for gitlab.com, can be overridden for custom instances
   ENDPOINTS: {
     PROJECTS: "/projects",
     MERGE_REQUESTS: "/merge_requests",
