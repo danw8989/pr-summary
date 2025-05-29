@@ -866,22 +866,40 @@ To import these templates:
     const token = await vscode.window.showInputBox({
       prompt: "Enter your GitHub Personal Access Token",
       password: true,
-      placeHolder: "ghp_...",
+      placeHolder: "ghp_... or github_pat_...",
       ignoreFocusOut: true,
       validateInput: (value) => {
         if (!value) return "Token is required";
-        if (!value.startsWith("ghp_") && !value.startsWith("github_pat_")) {
-          return "Invalid GitHub token format";
+
+        // Trim whitespace and check format
+        const trimmedValue = value.trim();
+        const validFormats = ["ghp_", "github_pat_", "ghs_", "gho_", "ghu_"];
+        const isValidFormat = validFormats.some((prefix) =>
+          trimmedValue.startsWith(prefix)
+        );
+
+        if (!isValidFormat) {
+          return `Invalid GitHub token format. Token should start with: ${validFormats.join(
+            ", "
+          )}`;
         }
+
+        // Check minimum length
+        if (trimmedValue.length < 10) {
+          return "Token appears to be too short";
+        }
+
         return null;
       },
     });
 
     if (token) {
+      // Trim the token before saving
+      const trimmedToken = token.trim();
       const config = vscode.workspace.getConfiguration("prSummary");
       await config.update(
         "github.token",
-        token,
+        trimmedToken,
         vscode.ConfigurationTarget.Global
       );
 
