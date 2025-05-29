@@ -36,6 +36,10 @@ export class PrSummaryTreeProvider
     this._onDidChangeTreeData.fire();
   }
 
+  get data(): PrSummaryTreeItem[] {
+    return this._data;
+  }
+
   getTreeItem(element: PrSummaryTreeItem): vscode.TreeItem {
     const treeItem = new vscode.TreeItem(
       element.label,
@@ -71,6 +75,18 @@ export class PrSummaryTreeProvider
 
     const includeDiffs = config.get<boolean>("includeDiffs", true);
     const additionalPrompt = config.get<string>("additionalPrompt", "");
+
+    const autoPostEnabled = config.get<boolean>("autoPost.enabled", false);
+    const autoPostState = config.get<string>("autoPost.defaultState", "ready");
+    const githubToken = config.get<string>("github.token", "");
+    const gitlabToken = config.get<string>("gitlab.token", "");
+
+    // Map state values to display names
+    const stateDisplayNames = {
+      ready: "Ready for Review",
+      draft: "Draft",
+      auto: "Auto-detect",
+    };
 
     this._data = [
       {
@@ -207,6 +223,73 @@ export class PrSummaryTreeProvider
             command: {
               command: "prSummary.setAdditionalPrompt",
               title: "Set Additional Prompt",
+            },
+          },
+        ],
+      },
+      {
+        id: "autoPost",
+        label: "Auto-Post Settings",
+        iconPath: new vscode.ThemeIcon("cloud-upload"),
+        contextValue: "autoPostSection",
+        children: [
+          {
+            id: "autoPostEnabled",
+            label: "Auto-Post to GitHub/GitLab",
+            description: autoPostEnabled ? "Enabled" : "Disabled",
+            iconPath: new vscode.ThemeIcon(
+              autoPostEnabled ? "check" : "circle-slash"
+            ),
+            contextValue: "autoPostEnabled",
+            command: {
+              command: "prSummary.toggleAutoPost",
+              title: "Toggle Auto-Post",
+            },
+          },
+          {
+            id: "configureGitHub",
+            label: "Configure GitHub Token",
+            description: githubToken ? "Configured" : "Not configured",
+            iconPath: new vscode.ThemeIcon("mark-github"),
+            contextValue: "configureGitHub",
+            command: {
+              command: "prSummary.configureGitHub",
+              title: "Configure GitHub",
+            },
+          },
+          {
+            id: "configureGitLab",
+            label: "Configure GitLab Token",
+            description: gitlabToken ? "Configured" : "Not configured",
+            iconPath: new vscode.ThemeIcon("gitlab"),
+            contextValue: "configureGitLab",
+            command: {
+              command: "prSummary.configureGitLab",
+              title: "Configure GitLab",
+            },
+          },
+          {
+            id: "testConnection",
+            label: "Test Connection",
+            iconPath: new vscode.ThemeIcon("debug-start"),
+            contextValue: "testConnection",
+            command: {
+              command: "prSummary.testConnection",
+              title: "Test Connection",
+            },
+          },
+          {
+            id: "autoPostState",
+            label: "Default PR State",
+            description:
+              stateDisplayNames[
+                autoPostState as keyof typeof stateDisplayNames
+              ] || "Ready for Review",
+            iconPath: new vscode.ThemeIcon("eye"),
+            contextValue: "autoPostState",
+            command: {
+              command: "prSummary.selectAutoPostState",
+              title: "Select Default State",
             },
           },
         ],

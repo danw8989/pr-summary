@@ -234,4 +234,39 @@ export class GitHelper {
       return [];
     }
   }
+
+  /**
+   * Get the remote URL for the repository
+   */
+  static async getRemoteUrl(): Promise<string | null> {
+    try {
+      // Try to get origin remote URL first
+      const { stdout } = await this.executeInWorkspaceRoot(
+        "git remote get-url origin"
+      );
+      return stdout.trim();
+    } catch (error) {
+      // If origin doesn't exist, try to get the first available remote
+      try {
+        const { stdout: remotes } = await this.executeInWorkspaceRoot(
+          "git remote"
+        );
+        const remoteList = remotes
+          .trim()
+          .split("\n")
+          .filter((r) => r.trim());
+
+        if (remoteList.length > 0) {
+          const { stdout: remoteUrl } = await this.executeInWorkspaceRoot(
+            `git remote get-url ${remoteList[0]}`
+          );
+          return remoteUrl.trim();
+        }
+      } catch (remoteError) {
+        console.error(`Failed to get remote URL: ${remoteError}`);
+      }
+
+      return null;
+    }
+  }
 }

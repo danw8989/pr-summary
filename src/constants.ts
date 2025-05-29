@@ -73,9 +73,46 @@ export const TEMPLATE_OPTIONS = [
   "Infrastructure",
 ];
 
+// Auto-post platform types
+export const AUTO_POST_PLATFORMS = ["github", "gitlab"] as const;
+export type AutoPostPlatform = (typeof AUTO_POST_PLATFORMS)[number];
+
+// GitHub API constants
+export const GITHUB_API = {
+  BASE_URL: "https://api.github.com",
+  ENDPOINTS: {
+    REPOS: "/repos",
+    PULLS: "/pulls",
+    USER: "/user",
+  },
+} as const;
+
+// GitLab API constants
+export const GITLAB_API = {
+  BASE_URL: "https://gitlab.com/api/v4",
+  ENDPOINTS: {
+    PROJECTS: "/projects",
+    MERGE_REQUESTS: "/merge_requests",
+    USER: "/user",
+  },
+} as const;
+
+// Auto-post settings
+export const AUTO_POST_SETTINGS = {
+  DRAFT: "draft",
+  READY: "ready",
+  AUTO: "auto", // Auto-detect based on branch patterns or keywords
+} as const;
+
+export type AutoPostState =
+  (typeof AUTO_POST_SETTINGS)[keyof typeof AUTO_POST_SETTINGS];
+
 // Context value storage keys
 export const STORAGE_KEYS = {
   PR_SUMMARY_HISTORY: "prSummaryHistory", // Legacy key
   HISTORY: "prSummaryHistory", // New key (using same value for backward compatibility)
   CUSTOM_TEMPLATES: "customTemplates",
+  GITHUB_TOKEN: "githubToken",
+  GITLAB_TOKEN: "gitlabToken",
+  AUTO_POST_SETTINGS: "autoPostSettings",
 };

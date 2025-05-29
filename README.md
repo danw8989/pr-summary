@@ -8,6 +8,7 @@ Generate comprehensive PR summaries using OpenAI's models based on your Git comm
 - **Smart Branch Selection**: Choose both source and target branches with intelligent defaults (main/master/develop)
 - **Multiple Template Styles**: Choose from 12 professionally-crafted templates including general styles (Short, Medium, Long, Thorough) and specialized templates (Bug Fix, Feature Request, Documentation, Refactoring, Security Fix, Performance, Dependencies, Infrastructure)
 - **Custom Templates**: Create, edit, and manage your own custom templates with a built-in editor
+- **Auto-Post to GitHub/GitLab**: Automatically create PRs/MRs after generating summaries with intelligent platform detection
 - **JIRA Integration**: Optional integration to link JIRA tickets to your PR summaries
 - **History Management**: View and reuse your previously generated PR summaries
 - **Native Document Display**: View results in VS Code's markdown editor with syntax highlighting
@@ -70,6 +71,95 @@ The extension adds a **PR Summary** icon to your Activity Bar (left sidebar). Cl
 - Edit or delete existing custom templates
 - Templates appear in template selector alongside built-in options
 
+## Auto-Post to GitHub/GitLab
+
+**🚀 Massive Productivity Boost**: Automatically create PRs/MRs directly from VS Code after generating summaries!
+
+### Features
+
+- **Intelligent Platform Detection**: Automatically detects whether you're using GitHub or GitLab based on your remote URL
+- **Secure Token Management**: Store GitHub/GitLab tokens securely in VS Code settings
+- **Smart State Detection**: Choose between Ready for Review, Draft, or Auto-detect based on branch naming patterns
+- **Connection Testing**: Verify your tokens and authentication before creating PRs/MRs
+- **One-Click Creation**: Generate summary and create PR/MR in a single workflow
+- **Direct Browser Opening**: Automatically open the created PR/MR in your browser
+
+### Setup
+
+#### GitHub Setup
+
+1. **Generate Personal Access Token**:
+
+   - Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
+   - Click "Generate new token (classic)"
+   - Select scopes: `repo` (for private repos) or `public_repo` (for public repos)
+   - Copy the token (starts with `ghp_` or `github_pat_`)
+
+2. **Configure in Extension**:
+   - Open PR Summary tree view
+   - Expand "Auto-Post Settings"
+   - Click "Configure GitHub Token"
+   - Paste your token and save
+
+#### GitLab Setup
+
+1. **Generate Personal Access Token**:
+
+   - Go to GitLab Settings > Access Tokens
+   - Create token with `api` scope
+   - Copy the token (starts with `glpat-`)
+
+2. **Configure in Extension**:
+   - Open PR Summary tree view
+   - Expand "Auto-Post Settings"
+   - Click "Configure GitLab Token"
+   - Paste your token and save
+
+### Usage
+
+1. **Enable Auto-Post**: Click "Auto-Post to GitHub/GitLab" to toggle on
+2. **Set Default State**: Choose your preferred PR/MR state:
+   - **Ready for Review**: Creates PR/MR ready for team review
+   - **Draft**: Creates draft PR/MR for work-in-progress
+   - **Auto-detect**: Detects from branch name patterns (draft/, wip/, etc.)
+3. **Test Connection**: Verify your setup works correctly
+4. **Generate & Post**: Use normal summary generation - you'll be prompted to auto-post
+
+### Auto-Detection Features
+
+- **Platform Detection**: Automatically detects GitHub vs GitLab from your git remote URL
+- **Branch Patterns**: Auto-detects draft state from branch names like:
+  - `draft/feature-name`
+  - `wip/work-in-progress`
+  - `temp/temporary-fix`
+- **Title Generation**: Creates meaningful PR/MR titles from branch names
+- **Repository Context**: Uses your current repository and branch information
+
+### Security & Privacy
+
+- **Local Storage**: Tokens are stored securely in VS Code's encrypted settings
+- **No External Storage**: Tokens never leave your machine except for direct API calls
+- **Scope Validation**: Extension validates token format and required permissions
+- **Connection Testing**: Test authentication without creating actual PRs/MRs
+
+### Workflow Integration
+
+The auto-post feature integrates seamlessly with your existing workflow:
+
+1. **Generate Summary**: Use any template to create your PR summary
+2. **Review Content**: Summary opens in VS Code for review/editing
+3. **Auto-Post Prompt**: Extension asks if you want to create the PR/MR
+4. **One-Click Creation**: Confirm to automatically create and open in browser
+5. **Continue Working**: Return to VS Code while PR/MR is live
+
+This eliminates the manual steps of:
+
+- Copying summary content
+- Opening GitHub/GitLab in browser
+- Creating new PR/MR
+- Pasting title and description
+- Setting draft/ready state
+
 ## Configuration
 
 ### Extension Settings
@@ -82,6 +172,10 @@ Access via Command Palette > "Preferences: Open Settings" and search for "PR Sum
 - `prSummary.jiraApiToken`: Your JIRA API token
 - `prSummary.defaultModel`: Default OpenAI model (gpt-4o, gpt-4o-mini)
 - `prSummary.defaultTemplate`: Default template style (Short, Medium, Long, Thorough, Bug Fix, Feature Request, Documentation, Refactoring, Security Fix, Performance, Dependencies, Infrastructure)
+- `prSummary.autoPost.enabled`: Enable auto-posting to GitHub/GitLab (default: false)
+- `prSummary.autoPost.defaultState`: Default PR/MR state (ready, draft, auto)
+- `prSummary.github.token`: GitHub Personal Access Token for auto-posting
+- `prSummary.gitlab.token`: GitLab Personal Access Token for auto-posting
 
 ### Quick Configuration
 
@@ -126,6 +220,13 @@ The extension provides a clean, organized tree view with three main sections:
 - OpenAI API Key status and configuration
 - JIRA integration status and setup
 - Quick access to extension settings
+
+### Auto-Post Settings
+
+- Enable/disable auto-posting to GitHub/GitLab
+- Configure GitHub and GitLab tokens
+- Test platform connections
+- Set default PR/MR state (Ready, Draft, Auto-detect)
 
 ### PR Summary Generation
 

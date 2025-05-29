@@ -76,6 +76,21 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.refresh", () =>
       treeProvider.refresh()
     ),
+    vscode.commands.registerCommand("prSummary.toggleAutoPost", () =>
+      commandsHandler.toggleAutoPost()
+    ),
+    vscode.commands.registerCommand("prSummary.configureGitHub", () =>
+      commandsHandler.configureGitHub()
+    ),
+    vscode.commands.registerCommand("prSummary.configureGitLab", () =>
+      commandsHandler.configureGitLab()
+    ),
+    vscode.commands.registerCommand("prSummary.testConnection", () =>
+      commandsHandler.testConnection()
+    ),
+    vscode.commands.registerCommand("prSummary.selectAutoPostState", () =>
+      commandsHandler.selectAutoPostState()
+    ),
   ];
 
   context.subscriptions.push(...commands);

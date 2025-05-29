@@ -6,6 +6,12 @@ import { TemplateManager, CustomTemplate } from "../utils/templateManager";
 import { HistoryManager } from "../utils/historyManager";
 import { PrSummaryTreeProvider } from "./prSummaryTreeProvider";
 import { PrSummaryResultProvider } from "./prSummaryResultsView";
+import { AutoPostService } from "../services/AutoPostService";
+import {
+  AUTO_POST_SETTINGS,
+  type AutoPostState,
+  type AutoPostPlatform,
+} from "../constants";
 
 export class PrSummaryCommands {
   private _context: vscode.ExtensionContext;
@@ -13,6 +19,7 @@ export class PrSummaryCommands {
   private _jiraHelper: JiraHelper;
   private _templateManager: TemplateManager;
   private _historyManager: HistoryManager;
+  private _autoPostService: AutoPostService;
 
   private _selectedBranch?: string;
   private _selectedTargetBranch?: string;
@@ -37,6 +44,7 @@ export class PrSummaryCommands {
     this._jiraHelper = new JiraHelper(jiraUrl, jiraEmail, jiraApiToken);
     this._templateManager = new TemplateManager();
     this._historyManager = new HistoryManager(context);
+    this._autoPostService = new AutoPostService();
 
     // Set intelligent default target branch
     this.setDefaultTargetBranch();
@@ -628,6 +636,10 @@ export class PrSummaryCommands {
           progress.report({ increment: 100, message: "Complete!" });
 
           this.showSummaryResult(summaryData.summary);
+
+          // Auto-post integration
+          const title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
+          await this.autoPostAfterGeneration(title, summaryData.summary);
         }
       );
     } catch (error) {
@@ -814,6 +826,261 @@ To import these templates:
 
       vscode.window.showInformationMessage(
         "💾 Templates exported! Save this file to backup your templates."
+      );
+    }
+  }
+
+  async toggleAutoPost(): Promise<void> {
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const enabled = config.get<boolean>("autoPost.enabled", false);
+
+    await config.update(
+      "autoPost.enabled",
+      !enabled,
+      vscode.ConfigurationTarget.Global
+    );
+
+    // Update tree view
+    const autoPostSection = this._treeProvider.data.find(
+      (item) => item.id === "autoPost"
+    );
+    if (autoPostSection?.children) {
+      const enabledItem = autoPostSection.children.find(
+        (item) => item.id === "autoPostEnabled"
+      );
+      if (enabledItem) {
+        enabledItem.description = !enabled ? "Enabled" : "Disabled";
+        enabledItem.iconPath = new vscode.ThemeIcon(
+          !enabled ? "check" : "circle-slash"
+        );
+      }
+    }
+
+    this._treeProvider.refresh();
+    vscode.window.showInformationMessage(
+      `Auto-post ${!enabled ? "enabled" : "disabled"}`
+    );
+  }
+
+  async configureGitHub(): Promise<void> {
+    const token = await vscode.window.showInputBox({
+      prompt: "Enter your GitHub Personal Access Token",
+      password: true,
+      placeHolder: "ghp_...",
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        if (!value) return "Token is required";
+        if (!value.startsWith("ghp_") && !value.startsWith("github_pat_")) {
+          return "Invalid GitHub token format";
+        }
+        return null;
+      },
+    });
+
+    if (token) {
+      const config = vscode.workspace.getConfiguration("prSummary");
+      await config.update(
+        "github.token",
+        token,
+        vscode.ConfigurationTarget.Global
+      );
+
+      // Test the token
+      const testResult = await this._autoPostService.testConnection("github");
+      if (testResult.success) {
+        vscode.window.showInformationMessage(
+          `GitHub token saved and verified! Authenticated as: ${testResult.username}`
+        );
+      } else {
+        vscode.window.showWarningMessage(
+          `GitHub token saved but verification failed: ${testResult.error}`
+        );
+      }
+    }
+  }
+
+  async configureGitLab(): Promise<void> {
+    const token = await vscode.window.showInputBox({
+      prompt: "Enter your GitLab Personal Access Token",
+      password: true,
+      placeHolder: "glpat-...",
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        if (!value) return "Token is required";
+        if (!value.startsWith("glpat-")) {
+          return "Invalid GitLab token format (should start with glpat-)";
+        }
+        return null;
+      },
+    });
+
+    if (token) {
+      const config = vscode.workspace.getConfiguration("prSummary");
+      await config.update(
+        "gitlab.token",
+        token,
+        vscode.ConfigurationTarget.Global
+      );
+
+      // Test the token
+      const testResult = await this._autoPostService.testConnection("gitlab");
+      if (testResult.success) {
+        vscode.window.showInformationMessage(
+          `GitLab token saved and verified! Authenticated as: ${testResult.username}`
+        );
+      } else {
+        vscode.window.showWarningMessage(
+          `GitLab token saved but verification failed: ${testResult.error}`
+        );
+      }
+    }
+  }
+
+  async testConnection(): Promise<void> {
+    const platform = await vscode.window.showQuickPick(
+      [
+        { label: "GitHub", value: "github" as AutoPostPlatform },
+        { label: "GitLab", value: "gitlab" as AutoPostPlatform },
+      ],
+      {
+        placeHolder: "Select platform to test",
+        ignoreFocusOut: true,
+      }
+    );
+
+    if (!platform) return;
+
+    const testResult = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Testing ${platform.label} connection...`,
+        cancellable: false,
+      },
+      async () => {
+        return await this._autoPostService.testConnection(platform.value);
+      }
+    );
+
+    if (testResult.success) {
+      vscode.window.showInformationMessage(
+        `✅ ${platform.label} connection successful! Authenticated as: ${testResult.username}`
+      );
+    } else {
+      vscode.window.showErrorMessage(
+        `❌ ${platform.label} connection failed: ${testResult.error}`
+      );
+    }
+  }
+
+  async selectAutoPostState(): Promise<void> {
+    const options = [
+      {
+        label: "Ready for Review",
+        detail: "Create PR/MR ready for review",
+        value: AUTO_POST_SETTINGS.READY,
+      },
+      {
+        label: "Draft",
+        detail: "Create as draft PR/MR",
+        value: AUTO_POST_SETTINGS.DRAFT,
+      },
+      {
+        label: "Auto-detect",
+        detail: "Detect from branch name or title keywords",
+        value: AUTO_POST_SETTINGS.AUTO,
+      },
+    ];
+
+    const selected = await vscode.window.showQuickPick(options, {
+      placeHolder: "Select default PR/MR state",
+      ignoreFocusOut: true,
+    });
+
+    if (selected) {
+      const config = vscode.workspace.getConfiguration("prSummary");
+      await config.update(
+        "autoPost.defaultState",
+        selected.value,
+        vscode.ConfigurationTarget.Global
+      );
+
+      // Update tree view
+      const autoPostSection = this._treeProvider.data.find(
+        (item) => item.id === "autoPost"
+      );
+      if (autoPostSection?.children) {
+        const stateItem = autoPostSection.children.find(
+          (item) => item.id === "autoPostState"
+        );
+        if (stateItem) {
+          stateItem.description = selected.label;
+        }
+      }
+
+      this._treeProvider.refresh();
+      vscode.window.showInformationMessage(
+        `Default PR/MR state set to: ${selected.label}`
+      );
+    }
+  }
+
+  async autoPostAfterGeneration(title: string, summary: string): Promise<void> {
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const autoPostEnabled = config.get<boolean>("autoPost.enabled", false);
+
+    if (!autoPostEnabled) return;
+
+    const shouldPost = await vscode.window.showQuickPick(["Yes", "No"], {
+      placeHolder: "Auto-post this PR/MR to GitHub/GitLab?",
+      ignoreFocusOut: true,
+    });
+
+    if (shouldPost !== "Yes") return;
+
+    if (!this._selectedBranch) {
+      vscode.window.showErrorMessage("No source branch selected");
+      return;
+    }
+
+    if (!this._selectedTargetBranch) {
+      vscode.window.showErrorMessage("No target branch selected");
+      return;
+    }
+
+    const defaultState = config.get<AutoPostState>(
+      "autoPost.defaultState",
+      "ready"
+    );
+
+    const result = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Creating PR/MR...",
+        cancellable: false,
+      },
+      async () => {
+        return await this._autoPostService.autoPost(
+          title,
+          summary,
+          this._selectedBranch!,
+          this._selectedTargetBranch!,
+          defaultState
+        );
+      }
+    );
+
+    if (result.success) {
+      const openAction = await vscode.window.showInformationMessage(
+        `✅ PR/MR created successfully on ${result.platform}!`,
+        "Open in Browser"
+      );
+
+      if (openAction === "Open in Browser" && result.url) {
+        vscode.env.openExternal(vscode.Uri.parse(result.url));
+      }
+    } else {
+      vscode.window.showErrorMessage(
+        `❌ Failed to create PR/MR: ${result.error}`
       );
     }
   }

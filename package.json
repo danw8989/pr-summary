@@ -278,7 +278,37 @@
         "prSummary.additionalPrompt": {
           "type": "string",
           "default": "",
-          "description": "Additional custom instructions to append to the default prompt (e.g., 'Focus on UI changes', 'Include performance implications')"
+          "description": "Additional instructions to include in the AI prompt for generating PR summaries"
+        },
+        "prSummary.autoPost.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable auto-posting PR summaries to GitHub/GitLab"
+        },
+        "prSummary.autoPost.defaultState": {
+          "type": "string",
+          "default": "ready",
+          "enum": [
+            "ready",
+            "draft",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Create PR/MR ready for review",
+            "Create as draft PR/MR",
+            "Auto-detect from branch name or title keywords"
+          ],
+          "description": "Default state for auto-posted PRs/MRs"
+        },
+        "prSummary.github.token": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub Personal Access Token for auto-posting PRs"
+        },
+        "prSummary.gitlab.token": {
+          "type": "string",
+          "default": "",
+          "description": "GitLab Personal Access Token for auto-posting MRs"
         }
       }
     }
