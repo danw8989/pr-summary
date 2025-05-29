@@ -521,8 +521,15 @@ export class PrSummaryCommands {
       Short: "Brief summary with key changes",
       Medium: "Balanced summary with details",
       Long: "Comprehensive summary with full context",
-      "Bullet Points": "Summary in bullet point format",
-      Technical: "Technical-focused summary for developers",
+      Thorough: "Very detailed summary with impacts",
+      "Bug Fix": "Structured summary for bug fixes",
+      "Feature Request": "Feature-focused summary with benefits",
+      Documentation: "Documentation-specific summary format",
+      Refactoring: "Refactoring summary with benefits",
+      "Security Fix": "Security-focused summary format",
+      Performance: "Performance optimization summary",
+      Dependencies: "Dependency update summary",
+      Infrastructure: "Infrastructure/DevOps summary",
     };
     return descriptions[template] || "Custom template";
   }

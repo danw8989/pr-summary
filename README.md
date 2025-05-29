@@ -6,7 +6,7 @@ Generate comprehensive PR summaries using OpenAI's models based on your Git comm
 
 - **Native VS Code Tree View**: Integrated seamlessly into VS Code's Activity Bar with familiar tree-based navigation
 - **Smart Branch Selection**: Choose both source and target branches with intelligent defaults (main/master/develop)
-- **Multiple Template Styles**: Choose from Short, Medium, Long, Bullet Points, and Technical summary styles
+- **Multiple Template Styles**: Choose from 12 professionally-crafted templates including general styles (Short, Medium, Long, Thorough) and specialized templates (Bug Fix, Feature Request, Documentation, Refactoring, Security Fix, Performance, Dependencies, Infrastructure)
 - **JIRA Integration**: Optional integration to link JIRA tickets to your PR summaries
 - **History Management**: View and reuse your previously generated PR summaries
 - **Native Document Display**: View results in VS Code's markdown editor with syntax highlighting
@@ -74,7 +74,7 @@ Access via Command Palette > "Preferences: Open Settings" and search for "PR Sum
 - `prSummary.jiraEmail`: Your JIRA email address
 - `prSummary.jiraApiToken`: Your JIRA API token
 - `prSummary.defaultModel`: Default OpenAI model (gpt-4o, gpt-4o-mini)
-- `prSummary.defaultTemplate`: Default template style (Short, Medium, Long, Thorough)
+- `prSummary.defaultTemplate`: Default template style (Short, Medium, Long, Thorough, Bug Fix, Feature Request, Documentation, Refactoring, Security Fix, Performance, Dependencies, Infrastructure)
 
 ### Quick Configuration
 
@@ -134,11 +134,25 @@ The extension provides a clean, organized tree view with three main sections:
 
 ## Template Styles
 
+### General Purpose Templates
+
 - **Short**: Brief summary with key changes only
 - **Medium**: Balanced summary with moderate detail (default)
 - **Long**: Comprehensive summary with full context
-- **Bullet Points**: Summary formatted as bullet points
-- **Technical**: Developer-focused technical summary
+- **Thorough**: Very detailed summary including potential impacts
+
+### Specialized Templates
+
+- **Bug Fix**: Structured format for bug fixes including root cause analysis and testing approach
+- **Feature Request**: Feature-focused summary highlighting user benefits and implementation decisions
+- **Documentation**: Optimized for documentation updates with target audience considerations
+- **Refactoring**: Emphasizes code improvements while confirming functional equivalence
+- **Security Fix**: Security-focused format addressing risks and mitigation strategies
+- **Performance**: Performance optimization summary with metrics and benchmarking results
+- **Dependencies**: Dependency update summary covering version changes and compatibility
+- **Infrastructure**: DevOps and infrastructure changes with deployment considerations
+
+These templates are based on [industry best practices for GitHub pull request templates](https://axolo.co/blog/p/part-3-github-pull-request-template) and provide structured guidance for different types of changes.
 
 ## Troubleshooting
 
