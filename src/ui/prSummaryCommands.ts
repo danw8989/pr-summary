@@ -440,17 +440,39 @@ export class PrSummaryCommands {
         return;
       }
 
+      // Get current branch for auto-selection
+      let currentBranch: string | null = null;
+      try {
+        currentBranch = await GitHelper.getCurrentBranchName();
+      } catch (error) {
+        console.log("Could not detect current branch:", error);
+      }
+
       const quickPick = vscode.window.createQuickPick();
       quickPick.title = "Select Source Branch for PR Summary";
       quickPick.placeholder =
-        "Choose the branch to compare against main/master";
+        "Choose the feature branch with your changes (usually current branch)";
+
       quickPick.items = branches.map((branch: string) => {
-        const isCurrentBranch = this.isCurrentBranch(branch);
+        const isCurrentBranch = branch === currentBranch;
+        const isSelected = branch === this._selectedBranch;
+
         return {
           label: branch,
-          detail: isCurrentBranch ? "Current branch" : undefined,
+          detail: isCurrentBranch
+            ? "✓ Current branch (recommended)"
+            : isSelected
+            ? "Currently selected"
+            : undefined,
+          description: isCurrentBranch ? "$(arrow-right)" : undefined,
         };
       });
+
+      // Auto-select current branch if not already selected
+      if (currentBranch && !this._selectedBranch) {
+        this._selectedBranch = currentBranch;
+        this._treeProvider.updateSelection("branch", this._selectedBranch);
+      }
 
       quickPick.onDidChangeSelection((selection) => {
         if (selection[0]) {
@@ -468,9 +490,9 @@ export class PrSummaryCommands {
   }
 
   private isCurrentBranch(branch: string): boolean {
-    // Remove async to fix the boolean condition issue
-    // We'll handle current branch detection differently if needed
-    return false; // Simplified for now
+    // This method is now replaced by the logic in selectBranch()
+    // Keeping for backwards compatibility but will be removed
+    return false;
   }
 
   async selectJiraTicket(): Promise<void> {
@@ -771,17 +793,27 @@ export class PrSummaryCommands {
         )
       );
 
+      // Auto-select default target branch if none selected
+      if (!this._selectedTargetBranch && availableTargetBranches.length > 0) {
+        this._selectedTargetBranch = availableTargetBranches[0];
+        this._treeProvider.updateSelection(
+          "targetBranch",
+          this._selectedTargetBranch
+        );
+      }
+
       const quickPick = vscode.window.createQuickPick();
       quickPick.title = "Select Target Branch for PR Summary";
-      quickPick.placeholder = "Choose the branch to compare changes against";
+      quickPick.placeholder =
+        "Choose the base branch to compare your changes against (e.g., main, master)";
 
       // Create items with common branches first, then all others
       const commonItems = availableTargetBranches.map((branch) => ({
         label: branch,
-        detail: `Recommended target branch`,
+        detail: `✓ Recommended target branch`,
         description:
           branch === this._selectedTargetBranch
-            ? "Currently selected"
+            ? "$(check) Currently selected"
             : undefined,
       }));
 
@@ -800,7 +832,7 @@ export class PrSummaryCommands {
         detail: undefined,
         description:
           branch === this._selectedTargetBranch
-            ? "Currently selected"
+            ? "$(check) Currently selected"
             : undefined,
       }));
 

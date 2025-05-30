@@ -30,6 +30,7 @@ export class PrSummaryTreeProvider
     this._context = context;
     this.initializeTree();
     this.loadCustomTemplates();
+    this.initializeDefaultBranches();
   }
 
   refresh(): void {
@@ -150,7 +151,8 @@ export class PrSummaryTreeProvider
         children: [
           {
             id: "selectBranch",
-            label: "Select Source Branch",
+            label: "Source Branch (Your Changes)",
+            description: "Not selected",
             iconPath: new vscode.ThemeIcon("git-branch"),
             contextValue: "selectBranch",
             command: {
@@ -160,7 +162,8 @@ export class PrSummaryTreeProvider
           },
           {
             id: "selectTargetBranch",
-            label: "Select Target Branch",
+            label: "Target Branch (Base/Main)",
+            description: "Not selected",
             iconPath: new vscode.ThemeIcon("git-merge"),
             contextValue: "selectTargetBranch",
             command: {
@@ -437,6 +440,51 @@ export class PrSummaryTreeProvider
         })),
       ];
     }
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Initialize default branch selections
+   */
+  private async initializeDefaultBranches(): Promise<void> {
+    try {
+      // This will be called by the commands handler when needed
+      // to avoid circular dependencies
+    } catch (error) {
+      console.log("Could not initialize default branches:", error);
+    }
+  }
+
+  /**
+   * Update branch selections with defaults
+   */
+  async updateDefaultBranches(
+    currentBranch?: string,
+    defaultTarget?: string
+  ): Promise<void> {
+    const section = this._data.find((item) => item.id === "generation");
+    if (!section?.children) return;
+
+    // Update source branch if provided
+    if (currentBranch) {
+      const sourceBranchItem = section.children.find(
+        (child) => child.id === "selectBranch"
+      );
+      if (sourceBranchItem && sourceBranchItem.description === "Not selected") {
+        sourceBranchItem.description = `${currentBranch} (auto-detected)`;
+      }
+    }
+
+    // Update target branch if provided
+    if (defaultTarget) {
+      const targetBranchItem = section.children.find(
+        (child) => child.id === "selectTargetBranch"
+      );
+      if (targetBranchItem && targetBranchItem.description === "Not selected") {
+        targetBranchItem.description = `${defaultTarget} (auto-detected)`;
+      }
+    }
+
     this._onDidChangeTreeData.fire();
   }
 }

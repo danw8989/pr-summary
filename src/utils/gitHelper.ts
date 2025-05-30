@@ -107,6 +107,13 @@ export class GitHelper {
     includeDiffs: boolean = false,
     maxCommits: number = 50
   ): Promise<string> {
+    // Validate branches before proceeding
+    const validation = await this.validateBranches(sourceBranch, targetBranch);
+    if (!validation.isValid) {
+      console.error(`Branch validation failed: ${validation.error}`);
+      throw new Error(validation.error);
+    }
+
     // First try with limited commits and appropriate buffer size
     try {
       return await this.getCommitMessagesWithDiffInternal(
@@ -177,6 +184,75 @@ export class GitHelper {
   }
 
   /**
+   * Validate that source and target branches exist and are different
+   */
+  private static async validateBranches(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<{ isValid: boolean; error?: string }> {
+    try {
+      // Check if source branch exists
+      try {
+        await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet ${sourceBranch}`
+        );
+      } catch (error) {
+        return {
+          isValid: false,
+          error: `Source branch "${sourceBranch}" does not exist. Please ensure you've selected the correct branch.`,
+        };
+      }
+
+      // Resolve target branch to see what will actually be used
+      const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+
+      // Check if resolved target branch exists
+      try {
+        await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet ${resolvedTargetBranch}`
+        );
+      } catch (error) {
+        return {
+          isValid: false,
+          error: `Target branch "${targetBranch}" (resolved to "${resolvedTargetBranch}") does not exist.`,
+        };
+      }
+
+      // Check if branches are different
+      try {
+        const { stdout: sourceCommit } = await this.executeInWorkspaceRoot(
+          `git rev-parse ${sourceBranch}`
+        );
+        const { stdout: targetCommit } = await this.executeInWorkspaceRoot(
+          `git rev-parse ${resolvedTargetBranch}`
+        );
+
+        if (sourceCommit.trim() === targetCommit.trim()) {
+          return {
+            isValid: false,
+            error: `Source branch "${sourceBranch}" and target branch "${targetBranch}" point to the same commit. No changes to compare.`,
+          };
+        }
+      } catch (error) {
+        console.warn(
+          "Could not compare branch commits, proceeding anyway:",
+          error
+        );
+      }
+
+      console.log(
+        `Branch validation passed: ${sourceBranch} -> ${resolvedTargetBranch}`
+      );
+      return { isValid: true };
+    } catch (error) {
+      return {
+        isValid: false,
+        error: `Failed to validate branches: ${error}`,
+      };
+    }
+  }
+
+  /**
    * Internal method to get commit messages with diffs
    */
   private static async getCommitMessagesWithDiffInternal(
@@ -198,52 +274,16 @@ export class GitHelper {
       gitLogCommand.push("--unified=3");
     }
 
-    // Check if main exists, otherwise try master
-    try {
-      const { stdout: branchList } = await this.executeInWorkspaceRoot(
-        "git branch -a"
-      );
+    // Improve target branch detection
+    const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+    console.log(`Resolved target branch: ${resolvedTargetBranch}`);
+    console.log(`Source branch: ${sourceBranch}`);
 
-      // If targetBranch is still default and main doesn't exist but master does
-      if (
-        targetBranch === "main" &&
-        !branchList.includes("main") &&
-        !branchList.includes("remotes/origin/main") &&
-        (branchList.includes("master") ||
-          branchList.includes("remotes/origin/master"))
-      ) {
-        targetBranch = "master";
-      }
-    } catch (error) {
-      console.warn(
-        "Failed to check branch list, using provided target branch",
-        error
-      );
-    }
-
-    // Format for local branches: targetBranch..sourceBranch
-    // Format for remote branches: remotes/origin/targetBranch..sourceBranch
-    let compareSpec = `${targetBranch}..${sourceBranch}`;
-
-    // If target branch doesn't have a slash, check if remote version exists
-    if (!targetBranch.includes("/")) {
-      try {
-        const { stdout: remoteExists } = await this.executeInWorkspaceRoot(
-          `git rev-parse --verify --quiet remotes/origin/${targetBranch}`
-        );
-
-        if (remoteExists) {
-          compareSpec = `remotes/origin/${targetBranch}..${sourceBranch}`;
-        }
-      } catch (error) {
-        // Remote branch doesn't exist, use local
-        console.log(
-          `Remote branch origin/${targetBranch} not found, using local branch`
-        );
-      }
-    }
-
+    // Format for git log: targetBranch..sourceBranch (shows commits in source but not in target)
+    const compareSpec = `${resolvedTargetBranch}..${sourceBranch}`;
     gitLogCommand.push(compareSpec, "--", ".");
+
+    console.log(`Git command: ${gitLogCommand.join(" ")}`);
 
     // Use larger buffer for diff operations, smaller for commit messages only
     const bufferSize = includeDiffs ? 20 * 1024 * 1024 : 5 * 1024 * 1024; // 20MB for diffs, 5MB for messages
@@ -263,6 +303,103 @@ export class GitHelper {
   }
 
   /**
+   * Resolve the target branch to use for comparison
+   * Handles local vs remote branch detection and main vs master fallback
+   */
+  private static async resolveTargetBranch(
+    targetBranch: string
+  ): Promise<string> {
+    try {
+      // First, check if the exact target branch exists locally
+      try {
+        await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet ${targetBranch}`
+        );
+        console.log(`Using local branch: ${targetBranch}`);
+        return targetBranch;
+      } catch (error) {
+        console.log(
+          `Local branch ${targetBranch} not found, checking remote...`
+        );
+      }
+
+      // Check if remote version exists
+      try {
+        await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet remotes/origin/${targetBranch}`
+        );
+        console.log(`Using remote branch: remotes/origin/${targetBranch}`);
+        return `remotes/origin/${targetBranch}`;
+      } catch (error) {
+        console.log(`Remote branch origin/${targetBranch} not found`);
+      }
+
+      // If targetBranch was "main", try "master" as fallback
+      if (targetBranch === "main") {
+        console.log("Trying master as fallback for main...");
+
+        // Try local master
+        try {
+          await this.executeInWorkspaceRoot(
+            `git rev-parse --verify --quiet master`
+          );
+          console.log("Using local master branch as fallback");
+          return "master";
+        } catch (error) {
+          console.log("Local master not found, checking remote...");
+        }
+
+        // Try remote master
+        try {
+          await this.executeInWorkspaceRoot(
+            `git rev-parse --verify --quiet remotes/origin/master`
+          );
+          console.log("Using remote master branch as fallback");
+          return "remotes/origin/master";
+        } catch (error) {
+          console.log("Remote master not found");
+        }
+      }
+
+      // If targetBranch was "master", try "main" as fallback
+      if (targetBranch === "master") {
+        console.log("Trying main as fallback for master...");
+
+        // Try local main
+        try {
+          await this.executeInWorkspaceRoot(
+            `git rev-parse --verify --quiet main`
+          );
+          console.log("Using local main branch as fallback");
+          return "main";
+        } catch (error) {
+          console.log("Local main not found, checking remote...");
+        }
+
+        // Try remote main
+        try {
+          await this.executeInWorkspaceRoot(
+            `git rev-parse --verify --quiet remotes/origin/main`
+          );
+          console.log("Using remote main branch as fallback");
+          return "remotes/origin/main";
+        } catch (error) {
+          console.log("Remote main not found");
+        }
+      }
+
+      // If all else fails, return the original target branch and let git handle the error
+      console.warn(
+        `Could not resolve target branch ${targetBranch}, using as-is`
+      );
+      return targetBranch;
+    } catch (error) {
+      console.error(`Error resolving target branch: ${error}`);
+      return targetBranch;
+    }
+  }
+
+  /**
    * Fallback method to get minimal commit messages when hitting buffer limits
    */
   private static async getMinimalCommitMessages(
@@ -272,22 +409,8 @@ export class GitHelper {
   ): Promise<string> {
     console.log("Getting minimal commit messages as fallback...");
 
-    let compareSpec = `${targetBranch}..${sourceBranch}`;
-
-    // Check for remote branch
-    if (!targetBranch.includes("/")) {
-      try {
-        const { stdout: remoteExists } = await this.executeInWorkspaceRoot(
-          `git rev-parse --verify --quiet remotes/origin/${targetBranch}`
-        );
-
-        if (remoteExists) {
-          compareSpec = `remotes/origin/${targetBranch}..${sourceBranch}`;
-        }
-      } catch (error) {
-        console.log("Using local branch for comparison");
-      }
-    }
+    const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+    const compareSpec = `${resolvedTargetBranch}..${sourceBranch}`;
 
     const command = `git log --max-count=${maxCommits} --pretty=format:"%s" ${compareSpec}`;
 
