@@ -21,13 +21,20 @@ export class GitHelper {
    * Execute a command in the workspace root directory
    */
   static async executeInWorkspaceRoot(
-    command: string
+    command: string,
+    options: { maxBuffer?: number; timeout?: number } = {}
   ): Promise<{ stdout: string; stderr: string }> {
     const workspaceRoot = this.getWorkspaceRootPath();
     console.log(`Executing command in workspace root: ${workspaceRoot}`);
     console.log(`Command: ${command}`);
 
-    return execPromise(command, { cwd: workspaceRoot });
+    const execOptions = {
+      cwd: workspaceRoot,
+      maxBuffer: options.maxBuffer || 10 * 1024 * 1024, // 10MB default (increased from 1MB)
+      timeout: options.timeout || 30000, // 30 seconds timeout
+    };
+
+    return execPromise(command, execOptions);
   }
 
   /**
@@ -97,12 +104,98 @@ export class GitHelper {
   static async getCommitMessagesWithDiff(
     sourceBranch: string,
     targetBranch: string = "main",
-    includeDiffs: boolean = false
+    includeDiffs: boolean = false,
+    maxCommits: number = 50
   ): Promise<string> {
-    const gitLogCommand = ["git", "log", "--pretty=format:%s%n%n%b"];
+    // First try with limited commits and appropriate buffer size
+    try {
+      return await this.getCommitMessagesWithDiffInternal(
+        sourceBranch,
+        targetBranch,
+        includeDiffs,
+        maxCommits
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // If we hit buffer limits, try fallback strategies
+      if (
+        errorMessage.includes("maxBuffer") ||
+        errorMessage.includes("MAXBUFFER")
+      ) {
+        console.warn("Hit buffer limit, trying fallback strategies...");
+
+        // Strategy 1: Reduce commits if we haven't already
+        if (maxCommits > 10) {
+          console.log(
+            `Retrying with fewer commits: ${Math.max(10, maxCommits / 2)}`
+          );
+          try {
+            return await this.getCommitMessagesWithDiffInternal(
+              sourceBranch,
+              targetBranch,
+              includeDiffs,
+              Math.max(10, Math.floor(maxCommits / 2))
+            );
+          } catch (retryError) {
+            console.warn(
+              "Still hitting buffer limits, trying without diffs..."
+            );
+          }
+        }
+
+        // Strategy 2: Remove diffs if included
+        if (includeDiffs) {
+          console.log("Retrying without diffs...");
+          try {
+            return await this.getCommitMessagesWithDiffInternal(
+              sourceBranch,
+              targetBranch,
+              false,
+              Math.min(maxCommits, 20)
+            );
+          } catch (retryError) {
+            console.warn(
+              "Still hitting buffer limits, trying minimal output..."
+            );
+          }
+        }
+
+        // Strategy 3: Get just commit titles (minimal output)
+        console.log("Using minimal commit output as final fallback...");
+        return await this.getMinimalCommitMessages(
+          sourceBranch,
+          targetBranch,
+          10
+        );
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
+  }
+
+  /**
+   * Internal method to get commit messages with diffs
+   */
+  private static async getCommitMessagesWithDiffInternal(
+    sourceBranch: string,
+    targetBranch: string,
+    includeDiffs: boolean,
+    maxCommits: number
+  ): Promise<string> {
+    const gitLogCommand = [
+      "git",
+      "log",
+      `--max-count=${maxCommits}`,
+      "--pretty=format:%s%n%n%b",
+    ];
 
     if (includeDiffs) {
       gitLogCommand.push("-p");
+      // Limit diff context for large changes
+      gitLogCommand.push("--unified=3");
     }
 
     // Check if main exists, otherwise try master
@@ -152,17 +245,70 @@ export class GitHelper {
 
     gitLogCommand.push(compareSpec, "--", ".");
 
+    // Use larger buffer for diff operations, smaller for commit messages only
+    const bufferSize = includeDiffs ? 20 * 1024 * 1024 : 5 * 1024 * 1024; // 20MB for diffs, 5MB for messages
+
     try {
       // Execute git command in workspace root
       const { stdout } = await this.executeInWorkspaceRoot(
-        gitLogCommand.join(" ")
+        gitLogCommand.join(" "),
+        { maxBuffer: bufferSize }
       );
       return stdout.trim();
     } catch (error) {
       // Log more detailed error information
       console.error(`Git error details: ${error}`);
-
       throw new Error(`Failed to get commit messages: ${error}`);
+    }
+  }
+
+  /**
+   * Fallback method to get minimal commit messages when hitting buffer limits
+   */
+  private static async getMinimalCommitMessages(
+    sourceBranch: string,
+    targetBranch: string,
+    maxCommits: number = 10
+  ): Promise<string> {
+    console.log("Getting minimal commit messages as fallback...");
+
+    let compareSpec = `${targetBranch}..${sourceBranch}`;
+
+    // Check for remote branch
+    if (!targetBranch.includes("/")) {
+      try {
+        const { stdout: remoteExists } = await this.executeInWorkspaceRoot(
+          `git rev-parse --verify --quiet remotes/origin/${targetBranch}`
+        );
+
+        if (remoteExists) {
+          compareSpec = `remotes/origin/${targetBranch}..${sourceBranch}`;
+        }
+      } catch (error) {
+        console.log("Using local branch for comparison");
+      }
+    }
+
+    const command = `git log --max-count=${maxCommits} --pretty=format:"%s" ${compareSpec}`;
+
+    try {
+      const { stdout } = await this.executeInWorkspaceRoot(command, {
+        maxBuffer: 1024 * 1024,
+      }); // 1MB should be enough for commit titles
+
+      if (!stdout.trim()) {
+        return "No commits found between branches.";
+      }
+
+      const commits = stdout.trim().split("\n");
+      return `Recent commits (${commits.length}):\n\n${commits
+        .map((commit) => `• ${commit}`)
+        .join(
+          "\n"
+        )}\n\nNote: Detailed diffs were too large to display. This summary shows commit titles only.`;
+    } catch (error) {
+      console.error(`Even minimal commit fetch failed: ${error}`);
+      return `Unable to fetch commit details due to repository size. Please ensure branches ${sourceBranch} and ${targetBranch} exist and have different commit histories.`;
     }
   }
 
