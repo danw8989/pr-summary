@@ -653,10 +653,25 @@ export class PrSummaryCommands {
           const includeDiffs = config.get<boolean>("includeDiffs", true);
           const maxCommits = config.get<number>("maxCommits", 50);
 
+          // Ensure we have a target branch selected before proceeding
+          if (!this._selectedTargetBranch) {
+            const result = await vscode.window.showWarningMessage(
+              "No target branch selected. Would you like to select one now?",
+              "Select Target Branch",
+              "Cancel"
+            );
+            if (result === "Select Target Branch") {
+              await this.selectTargetBranch();
+              if (!this._selectedTargetBranch) return;
+            } else {
+              return;
+            }
+          }
+
           const commitMessagesWithDiff =
             await GitHelper.getCommitMessagesWithDiff(
               this._selectedBranch!,
-              this._selectedTargetBranch || "main",
+              this._selectedTargetBranch!,
               includeDiffs,
               maxCommits
             );
@@ -691,7 +706,8 @@ export class PrSummaryCommands {
             true,
             this._selectedJiraTicket,
             model,
-            this._selectedBranch!
+            this._selectedBranch!,
+            this._selectedTargetBranch!
           );
 
           if (token.isCancellationRequested) return;
@@ -1236,8 +1252,17 @@ To import these templates:
     }
 
     if (!this._selectedTargetBranch) {
-      vscode.window.showErrorMessage("No target branch selected");
-      return;
+      const result = await vscode.window.showWarningMessage(
+        "No target branch selected. Would you like to select one now?",
+        "Select Target Branch",
+        "Cancel"
+      );
+      if (result === "Select Target Branch") {
+        await this.selectTargetBranch();
+        if (!this._selectedTargetBranch) return;
+      } else {
+        return;
+      }
     }
 
     const defaultState = config.get<AutoPostState>(
@@ -1339,7 +1364,17 @@ To import these templates:
     }
 
     if (!this._selectedTargetBranch) {
-      this._selectedTargetBranch = "main"; // Default fallback
+      const result = await vscode.window.showWarningMessage(
+        "No target branch selected. Would you like to select one now?",
+        "Select Target Branch",
+        "Cancel"
+      );
+      if (result === "Select Target Branch") {
+        await this.selectTargetBranch();
+        if (!this._selectedTargetBranch) return;
+      } else {
+        return;
+      }
     }
 
     // Get or generate title and summary
