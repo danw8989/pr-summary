@@ -335,6 +335,30 @@ export class PrSummaryTreeProvider
         ],
       },
       {
+        id: "commitPreview",
+        label: "Commit Preview",
+        iconPath: new vscode.ThemeIcon("git-commit"),
+        contextValue: "commitPreviewSection",
+        children: [
+          {
+            id: "commitPreviewPlaceholder",
+            label: "Select source and target branches to preview commits",
+            iconPath: new vscode.ThemeIcon("info"),
+            contextValue: "commitPreviewPlaceholder",
+          },
+          {
+            id: "refreshCommitPreview",
+            label: "Refresh Preview",
+            iconPath: new vscode.ThemeIcon("refresh"),
+            contextValue: "refreshCommitPreview",
+            command: {
+              command: "prSummary.refreshCommitPreview",
+              title: "Refresh Commit Preview",
+            },
+          },
+        ],
+      },
+      {
         id: "history",
         label: "Recent Summaries",
         iconPath: new vscode.ThemeIcon("history"),
@@ -484,6 +508,225 @@ export class PrSummaryTreeProvider
         targetBranchItem.description = `${defaultTarget} (auto-detected)`;
       }
     }
+
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Update commit preview when branches are selected
+   */
+  async updateCommitPreview(
+    sourceBranch?: string,
+    targetBranch?: string
+  ): Promise<void> {
+    const commitPreviewSection = this._data.find(
+      (item) => item.id === "commitPreview"
+    );
+    if (!commitPreviewSection) return;
+
+    // Always include refresh button
+    const refreshButton = {
+      id: "refreshCommitPreview",
+      label: "Refresh Preview",
+      iconPath: new vscode.ThemeIcon("refresh"),
+      contextValue: "refreshCommitPreview",
+      command: {
+        command: "prSummary.refreshCommitPreview",
+        title: "Refresh Commit Preview",
+      },
+    };
+
+    const viewDetailsButton = {
+      id: "viewCommitDetails",
+      label: "View Full Details",
+      iconPath: new vscode.ThemeIcon("eye"),
+      contextValue: "viewCommitDetails",
+      command: {
+        command: "prSummary.showCommitDetails",
+        title: "Show Commit Details",
+      },
+    };
+
+    if (!sourceBranch || !targetBranch) {
+      // Reset to placeholder
+      commitPreviewSection.children = [
+        {
+          id: "commitPreviewPlaceholder",
+          label: "Select source and target branches to preview commits",
+          iconPath: new vscode.ThemeIcon("info"),
+          contextValue: "commitPreviewPlaceholder",
+        },
+        refreshButton,
+      ];
+    } else {
+      // Show loading state
+      commitPreviewSection.children = [
+        {
+          id: "commitPreviewLoading",
+          label: "Loading commit preview...",
+          iconPath: new vscode.ThemeIcon("loading~spin"),
+          contextValue: "commitPreviewLoading",
+        },
+        refreshButton,
+      ];
+
+      this._onDidChangeTreeData.fire();
+
+      // Trigger the command to fetch commits (which will call updateCommitData)
+      vscode.commands.executeCommand(
+        "prSummary.fetchCommitPreview",
+        sourceBranch,
+        targetBranch
+      );
+    }
+
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Update the commit preview with actual commit data
+   */
+  updateCommitData(
+    commitMessages: string,
+    sourceBranch: string,
+    targetBranch: string
+  ): void {
+    const commitPreviewSection = this._data.find(
+      (item) => item.id === "commitPreview"
+    );
+    if (!commitPreviewSection) return;
+
+    const refreshButton = {
+      id: "refreshCommitPreview",
+      label: "Refresh Preview",
+      iconPath: new vscode.ThemeIcon("refresh"),
+      contextValue: "refreshCommitPreview",
+      command: {
+        command: "prSummary.refreshCommitPreview",
+        title: "Refresh Commit Preview",
+      },
+    };
+
+    const viewDetailsButton = {
+      id: "viewCommitDetails",
+      label: "View Full Details",
+      iconPath: new vscode.ThemeIcon("eye"),
+      contextValue: "viewCommitDetails",
+      command: {
+        command: "prSummary.showCommitDetails",
+        title: "Show Commit Details",
+      },
+    };
+
+    if (commitMessages && commitMessages.trim()) {
+      const commits = commitMessages
+        .trim()
+        .split("\n\n")
+        .filter((c: string) => c.trim());
+
+      if (commits.length > 0) {
+        commitPreviewSection.children = [
+          {
+            id: "commitPreviewInfo",
+            label: `${commits.length} commit${
+              commits.length === 1 ? "" : "s"
+            } between ${targetBranch} and ${sourceBranch}`,
+            iconPath: new vscode.ThemeIcon("info"),
+            contextValue: "commitPreviewInfo",
+          },
+          refreshButton,
+          viewDetailsButton,
+          ...commits.slice(0, 8).map((commit: string, index: number) => {
+            // Take first line as commit title, truncate if too long
+            const title = commit.split("\n")[0].substring(0, 80);
+            return {
+              id: `commitPreview-${index}`,
+              label: title + (commit.length > 80 ? "..." : ""),
+              iconPath: new vscode.ThemeIcon("git-commit"),
+              contextValue: "commitPreviewItem",
+              description: index === 0 ? "latest" : undefined,
+            };
+          }),
+          ...(commits.length > 8
+            ? [
+                {
+                  id: "commitPreviewMore",
+                  label: `... and ${commits.length - 8} more commits`,
+                  iconPath: new vscode.ThemeIcon("ellipsis"),
+                  contextValue: "commitPreviewMore",
+                },
+              ]
+            : []),
+        ];
+      } else {
+        commitPreviewSection.children = [
+          {
+            id: "commitPreviewEmpty",
+            label: "No commits found between these branches",
+            iconPath: new vscode.ThemeIcon("warning"),
+            contextValue: "commitPreviewEmpty",
+          },
+          refreshButton,
+          viewDetailsButton,
+        ];
+      }
+    } else {
+      commitPreviewSection.children = [
+        {
+          id: "commitPreviewEmpty",
+          label: "No commits found between these branches",
+          iconPath: new vscode.ThemeIcon("warning"),
+          contextValue: "commitPreviewEmpty",
+        },
+        refreshButton,
+        viewDetailsButton,
+      ];
+    }
+
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Show error in commit preview
+   */
+  showCommitPreviewError(error: string): void {
+    const commitPreviewSection = this._data.find(
+      (item) => item.id === "commitPreview"
+    );
+    if (!commitPreviewSection) return;
+
+    const refreshButton = {
+      id: "refreshCommitPreview",
+      label: "Refresh Preview",
+      iconPath: new vscode.ThemeIcon("refresh"),
+      contextValue: "refreshCommitPreview",
+      command: {
+        command: "prSummary.refreshCommitPreview",
+        title: "Refresh Commit Preview",
+      },
+    };
+
+    const viewDetailsButton = {
+      id: "viewCommitDetails",
+      label: "View Full Details",
+      iconPath: new vscode.ThemeIcon("eye"),
+      contextValue: "viewCommitDetails",
+      command: {
+        command: "prSummary.showCommitDetails",
+        title: "Show Commit Details",
+      },
+    };
+
+    commitPreviewSection.children = [
+      {
+        id: "commitPreviewError",
+        label: `Error: ${error}`,
+        iconPath: new vscode.ThemeIcon("error"),
+        contextValue: "commitPreviewError",
+      },
+      refreshButton,
+      viewDetailsButton,
+    ];
 
     this._onDidChangeTreeData.fire();
   }

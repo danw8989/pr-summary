@@ -97,6 +97,17 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.manualPostPR", () =>
       commandsHandler.manualPostPR()
     ),
+    vscode.commands.registerCommand("prSummary.refreshCommitPreview", () =>
+      commandsHandler.refreshCommitPreview()
+    ),
+    vscode.commands.registerCommand(
+      "prSummary.fetchCommitPreview",
+      (sourceBranch, targetBranch) =>
+        commandsHandler.fetchCommitPreview(sourceBranch, targetBranch)
+    ),
+    vscode.commands.registerCommand("prSummary.showCommitDetails", () =>
+      commandsHandler.showCommitDetails()
+    ),
   ];
 
   context.subscriptions.push(...commands);

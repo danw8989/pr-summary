@@ -144,6 +144,23 @@ export class PrSummaryCommands {
         "targetBranch",
         `${defaultBranch} (default)`
       );
+
+      // Try to get current branch for auto-selection and preview
+      try {
+        const currentBranch = await GitHelper.getCurrentBranchName();
+        if (currentBranch && currentBranch !== defaultBranch) {
+          this._selectedBranch = currentBranch;
+          this._treeProvider.updateSelection(
+            "branch",
+            `${currentBranch} (auto-detected)`
+          );
+
+          // Update commit preview with both branches
+          await this.fetchCommitPreview(currentBranch, defaultBranch);
+        }
+      } catch (error) {
+        console.log("Could not auto-detect current branch:", error);
+      }
     } catch (error) {
       // Fallback to "main" if we can't detect branches
       this._selectedTargetBranch = "main";
@@ -478,6 +495,15 @@ export class PrSummaryCommands {
         if (selection[0]) {
           this._selectedBranch = selection[0].label;
           this._treeProvider.updateSelection("branch", this._selectedBranch);
+
+          // Update commit preview with both branches
+          if (this._selectedTargetBranch) {
+            this.fetchCommitPreview(
+              this._selectedBranch,
+              this._selectedTargetBranch
+            );
+          }
+
           quickPick.hide();
         }
       });
@@ -863,6 +889,15 @@ export class PrSummaryCommands {
             "targetBranch",
             this._selectedTargetBranch
           );
+
+          // Update commit preview with both branches
+          if (this._selectedBranch) {
+            this.fetchCommitPreview(
+              this._selectedBranch,
+              this._selectedTargetBranch
+            );
+          }
+
           quickPick.hide();
         }
       });
@@ -994,7 +1029,6 @@ To import these templates:
         if (trimmedValue.length < 10) {
           return "Token appears to be too short";
         }
-
         return null;
       },
     });
@@ -1491,6 +1525,104 @@ To import these templates:
       this.updateHistoryDisplay(recentHistory);
     } catch (error) {
       console.error("Error refreshing history:", error);
+    }
+  }
+
+  /**
+   * Refresh commit preview
+   */
+  async refreshCommitPreview(): Promise<void> {
+    if (this._selectedBranch && this._selectedTargetBranch) {
+      await this.fetchCommitPreview(
+        this._selectedBranch,
+        this._selectedTargetBranch
+      );
+    } else {
+      vscode.window.showInformationMessage(
+        "Please select both source and target branches to see commit preview"
+      );
+    }
+  }
+
+  /**
+   * Fetch commit preview data (called internally by tree provider)
+   */
+  async fetchCommitPreview(
+    sourceBranch: string,
+    targetBranch: string
+  ): Promise<void> {
+    try {
+      // Get commits without diffs for preview (faster and smaller)
+      const commitMessages = await GitHelper.getCommitMessagesWithDiff(
+        sourceBranch,
+        targetBranch,
+        false, // no diffs for preview
+        10 // limit to 10 commits for preview
+      );
+
+      this._treeProvider.updateCommitData(
+        commitMessages,
+        sourceBranch,
+        targetBranch
+      );
+    } catch (error) {
+      console.error("Error fetching commit preview:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this._treeProvider.showCommitPreviewError(errorMessage);
+    }
+  }
+
+  /**
+   * Show detailed view of commits between branches
+   */
+  async showCommitDetails(): Promise<void> {
+    if (!this._selectedBranch || !this._selectedTargetBranch) {
+      vscode.window.showInformationMessage(
+        "Please select both source and target branches first"
+      );
+      return;
+    }
+
+    try {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Loading detailed commit information...",
+          cancellable: false,
+        },
+        async () => {
+          const commitMessagesWithDiff =
+            await GitHelper.getCommitMessagesWithDiff(
+              this._selectedBranch!,
+              this._selectedTargetBranch!,
+              true, // include diffs
+              20 // more commits for detailed view
+            );
+
+          const content = `# Commits: ${this._selectedBranch} → ${
+            this._selectedTargetBranch
+          }
+
+${commitMessagesWithDiff || "No commits found between these branches"}
+
+---
+*This preview shows the commits and changes that will be included in your PR summary.*
+`;
+
+          const document = await vscode.workspace.openTextDocument({
+            content: content,
+            language: "markdown",
+          });
+
+          await vscode.window.showTextDocument(document, {
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false,
+          });
+        }
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to load commit details: ${error}`);
     }
   }
 }
