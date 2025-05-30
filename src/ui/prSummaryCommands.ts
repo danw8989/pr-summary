@@ -268,6 +268,40 @@ export class PrSummaryCommands {
     }
   }
 
+  async setMaxCommits(): Promise<void> {
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const currentMaxCommits = config.get<number>("maxCommits", 50);
+
+    const newMaxCommits = await vscode.window.showInputBox({
+      prompt: "Enter maximum number of commits to include (5-200)",
+      placeHolder: "50",
+      value: currentMaxCommits.toString(),
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        const num = parseInt(value);
+        if (isNaN(num) || num < 5 || num > 200) {
+          return "Please enter a number between 5 and 200";
+        }
+        return null;
+      },
+    });
+
+    if (newMaxCommits !== undefined) {
+      const maxCommits = parseInt(newMaxCommits);
+      await config.update(
+        "maxCommits",
+        maxCommits,
+        vscode.ConfigurationTarget.Global
+      );
+
+      vscode.window.showInformationMessage(
+        `Maximum commits set to ${maxCommits}. Lower values help avoid buffer limit errors with large repositories.`
+      );
+
+      this._treeProvider.refresh();
+    }
+  }
+
   async createCustomTemplate(): Promise<void> {
     // Step 1: Get template name
     const templateName = await vscode.window.showInputBox({
@@ -569,12 +603,14 @@ export class PrSummaryCommands {
 
           const config = vscode.workspace.getConfiguration("prSummary");
           const includeDiffs = config.get<boolean>("includeDiffs", true);
+          const maxCommits = config.get<number>("maxCommits", 50);
 
           const commitMessagesWithDiff =
             await GitHelper.getCommitMessagesWithDiff(
               this._selectedBranch!,
               this._selectedTargetBranch || "main",
-              includeDiffs
+              includeDiffs,
+              maxCommits
             );
 
           if (token.isCancellationRequested) return;
@@ -643,7 +679,42 @@ export class PrSummaryCommands {
         }
       );
     } catch (error) {
-      vscode.window.showErrorMessage(`Failed to generate summary: ${error}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // Handle buffer limit errors with helpful guidance
+      if (
+        errorMessage.includes("maxBuffer") ||
+        errorMessage.includes("MAXBUFFER")
+      ) {
+        const action = await vscode.window.showErrorMessage(
+          `Repository is too large: ${errorMessage}`,
+          "Reduce Max Commits",
+          "Disable Diffs",
+          "Open Settings"
+        );
+
+        if (action === "Reduce Max Commits") {
+          await this.setMaxCommits();
+        } else if (action === "Disable Diffs") {
+          const config = vscode.workspace.getConfiguration("prSummary");
+          await config.update(
+            "includeDiffs",
+            false,
+            vscode.ConfigurationTarget.Global
+          );
+          vscode.window.showInformationMessage(
+            "Code diffs disabled. Try generating the summary again."
+          );
+          this._treeProvider.refresh();
+        } else if (action === "Open Settings") {
+          await this.openSettings();
+        }
+      } else {
+        vscode.window.showErrorMessage(
+          `Failed to generate summary: ${errorMessage}`
+        );
+      }
     }
   }
 

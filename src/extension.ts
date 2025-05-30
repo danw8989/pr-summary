@@ -51,6 +51,9 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.setAdditionalPrompt", () =>
       commandsHandler.setAdditionalPrompt()
     ),
+    vscode.commands.registerCommand("prSummary.setMaxCommits", () =>
+      commandsHandler.setMaxCommits()
+    ),
     vscode.commands.registerCommand("prSummary.createCustomTemplate", () =>
       commandsHandler.createCustomTemplate()
     ),

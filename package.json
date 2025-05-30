@@ -2,7 +2,7 @@
   "name": "pr-summary",
   "displayName": "AI PR Summary Generator",
   "description": "🚀 Automate PR summaries with AI! Generate professional pull request descriptions from Git commits using OpenAI. Includes 12 templates, JIRA integration, and auto-posting to GitHub/GitLab.",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
@@ -93,6 +93,11 @@
         "icon": "$(edit)"
       },
       {
+        "command": "prSummary.setMaxCommits",
+        "title": "Set Maximum Commits",
+        "icon": "$(number)"
+      },
+      {
         "command": "prSummary.createCustomTemplate",
         "title": "Create Custom Template",
         "icon": "$(add)"
@@ -170,6 +175,9 @@
         },
         {
           "command": "prSummary.setAdditionalPrompt"
+        },
+        {
+          "command": "prSummary.setMaxCommits"
         },
         {
           "command": "prSummary.selectTemplate"
@@ -308,6 +316,13 @@
           "type": "string",
           "default": "",
           "description": "Additional instructions to include in the AI prompt for generating PR summaries"
+        },
+        "prSummary.maxCommits": {
+          "type": "number",
+          "default": 50,
+          "minimum": 5,
+          "maximum": 200,
+          "description": "Maximum number of commits to include in PR summary generation (lower values help avoid buffer limits)"
         },
         "prSummary.autoPost.enabled": {
           "type": "boolean",
