@@ -658,6 +658,7 @@ export class PrSummaryCommands {
             timestamp: new Date().toISOString(),
           };
 
+          // Save to history and wait for completion
           await this._historyManager.saveSummary(
             this._selectedBranch!,
             this._selectedJiraTicket,
@@ -666,14 +667,16 @@ export class PrSummaryCommands {
             this._selectedTemplate!
           );
 
+          // Ensure history is updated in UI
           const recentHistory = await this._historyManager.getHistory();
           this.updateHistoryDisplay(recentHistory);
 
           progress.report({ increment: 100, message: "Complete!" });
 
+          // Show the summary result first
           this.showSummaryResult(summaryData.summary);
 
-          // Auto-post integration
+          // Then handle auto-post with the fresh summary
           const title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
           await this.autoPostAfterGeneration(title, summaryData.summary);
         }
@@ -1119,6 +1122,41 @@ To import these templates:
 
     if (!autoPostEnabled) return;
 
+    // First check if source branch is pushed to remote
+    if (this._selectedBranch) {
+      const branchPushed = await this.checkBranchPushedToRemote(
+        this._selectedBranch
+      );
+
+      if (!branchPushed) {
+        const shouldPush = await vscode.window.showWarningMessage(
+          `Branch "${this._selectedBranch}" is not pushed to remote. Push it before creating PR/MR?`,
+          "Push & Continue",
+          "Skip Auto-Post",
+          "Cancel"
+        );
+
+        if (shouldPush === "Push & Continue") {
+          const pushResult = await this.pushBranchToRemote(
+            this._selectedBranch
+          );
+          if (!pushResult.success) {
+            vscode.window.showErrorMessage(
+              `Failed to push branch: ${pushResult.error}`
+            );
+            return;
+          }
+          vscode.window.showInformationMessage(
+            `✅ Branch "${this._selectedBranch}" pushed successfully!`
+          );
+        } else if (shouldPush === "Skip Auto-Post") {
+          return; // Skip auto-posting
+        } else {
+          return; // Cancel
+        }
+      }
+    }
+
     const shouldPost = await vscode.window.showQuickPick(["Yes", "No"], {
       placeHolder: "Auto-post this PR/MR to GitHub/GitLab?",
       ignoreFocusOut: true,
@@ -1175,6 +1213,48 @@ To import these templates:
   }
 
   /**
+   * Check if a branch is pushed to remote
+   */
+  private async checkBranchPushedToRemote(
+    branchName: string
+  ): Promise<boolean> {
+    try {
+      const { stdout } = await GitHelper.executeInWorkspaceRoot(
+        `git ls-remote --heads origin ${branchName}`
+      );
+      return stdout.trim().length > 0;
+    } catch (error) {
+      console.log(`Could not check remote branch status: ${error}`);
+      return false; // Assume not pushed if we can't check
+    }
+  }
+
+  /**
+   * Push branch to remote
+   */
+  private async pushBranchToRemote(
+    branchName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      return await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Pushing branch "${branchName}"...`,
+          cancellable: false,
+        },
+        async () => {
+          return await GitHelper.pushBranch(branchName);
+        }
+      );
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
    * Manual PR/MR posting - allows users to manually create PR/MR with more control
    */
   async manualPostPR(): Promise<void> {
@@ -1215,7 +1295,10 @@ To import these templates:
     if (!useExistingSummary) return;
 
     if (useExistingSummary === "Use Last Generated Summary") {
+      // Refresh history to get the absolute latest
+      await this.refreshHistoryFromStorage();
       const recentHistory = await this._historyManager.getHistory();
+
       if (recentHistory.length === 0) {
         vscode.window.showErrorMessage(
           "No previous summary found. Please generate a summary first."
@@ -1223,15 +1306,55 @@ To import these templates:
         return;
       }
 
+      // Get the most recent summary (index 0 should be the newest)
       const lastSummary = recentHistory[0];
       title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
       summary = lastSummary.summary;
+
+      // Show confirmation of what will be used
+      const confirmSummary = await vscode.window.showQuickPick(
+        ["Use This Summary", "Show Preview", "Cancel"],
+        {
+          placeHolder: `Using summary from ${
+            lastSummary.branchName
+          } (${new Date(lastSummary.created).toLocaleString()})`,
+          ignoreFocusOut: true,
+        }
+      );
+
+      if (confirmSummary === "Show Preview") {
+        // Show preview in a new document
+        const previewDoc = await vscode.workspace.openTextDocument({
+          content: `# PR/MR Preview\n\n**Title:** ${title}\n\n**Summary:**\n${summary}`,
+          language: "markdown",
+        });
+        await vscode.window.showTextDocument(previewDoc, { preview: true });
+
+        const proceedWithPreview = await vscode.window.showQuickPick(
+          ["Use This Summary", "Cancel"],
+          {
+            placeHolder: "Proceed with this summary?",
+            ignoreFocusOut: true,
+          }
+        );
+
+        if (proceedWithPreview !== "Use This Summary") {
+          return;
+        }
+      } else if (confirmSummary !== "Use This Summary") {
+        return;
+      }
     } else if (useExistingSummary === "Generate New Summary") {
       // Generate a new summary first
       await this.generateSummary();
 
-      // Get the newly generated summary
+      // Wait a moment to ensure the summary is saved
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Refresh and get the newly generated summary
+      await this.refreshHistoryFromStorage();
       const recentHistory = await this._historyManager.getHistory();
+
       if (recentHistory.length === 0) {
         vscode.window.showErrorMessage("Failed to generate summary.");
         return;
@@ -1323,6 +1446,19 @@ To import these templates:
       } else {
         vscode.window.showErrorMessage(errorMessage);
       }
+    }
+  }
+
+  /**
+   * Refresh history from storage to ensure we have the latest data
+   */
+  private async refreshHistoryFromStorage(): Promise<void> {
+    try {
+      // Force refresh the history from storage
+      const recentHistory = await this._historyManager.getHistory();
+      this.updateHistoryDisplay(recentHistory);
+    } catch (error) {
+      console.error("Error refreshing history:", error);
     }
   }
 }
