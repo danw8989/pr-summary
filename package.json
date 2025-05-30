@@ -2,7 +2,7 @@
   "name": "pr-summary",
   "displayName": "AI PR Summary Generator",
   "description": "🚀 Automate PR summaries with AI! Generate professional pull request descriptions from Git commits using OpenAI. Includes 12 templates, JIRA integration, and auto-posting to GitHub/GitLab.",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "publisher": "InZarys",
   "license": "MIT",
   "icon": "media/pr-summary.png",
