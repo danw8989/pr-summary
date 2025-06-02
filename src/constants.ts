@@ -54,7 +54,9 @@ export const TEMPLATE_PROMPTS: Record<string, string> = {
 - Monitoring or observability improvements`,
 };
 
-// Models
+// Models - Fallback list used when dynamic fetching from OpenAI API fails
+// The extension now dynamically fetches available models using OpenAIHelper.fetchChatModels()
+// Use "Refresh Available Models" command to update the list from OpenAI API
 export const OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini"];
 
 // Template options

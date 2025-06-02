@@ -121,6 +121,16 @@
         "command": "prSummary.manualPostPR",
         "title": "Manual Post PR/MR",
         "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "prSummary.refreshAvailableModels",
+        "title": "Refresh Available Models",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "prSummary.selectModel",
+        "title": "Select OpenAI Model",
+        "icon": "$(list-selection)"
       }
     ],
     "viewsContainers": {
@@ -190,6 +200,12 @@
         },
         {
           "command": "prSummary.manualPostPR"
+        },
+        {
+          "command": "prSummary.refreshAvailableModels"
+        },
+        {
+          "command": "prSummary.selectModel"
         }
       ],
       "view/title": [
@@ -239,6 +255,21 @@
           "command": "prSummary.manualPostPR",
           "when": "view == prSummaryTree && viewItem == manualPost",
           "group": "inline"
+        },
+        {
+          "command": "prSummary.refreshAvailableModels",
+          "when": "view == prSummaryTree && viewItem == refreshModels",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.selectModel",
+          "when": "view == prSummaryTree && viewItem == currentModel",
+          "group": "inline"
+        },
+        {
+          "command": "prSummary.selectModel",
+          "when": "view == prSummaryTree && viewItem == selectModel",
+          "group": "inline"
         }
       ],
       "editor/title": [
@@ -282,11 +313,7 @@
         "prSummary.defaultModel": {
           "type": "string",
           "default": "gpt-4o-mini",
-          "enum": [
-            "gpt-4o",
-            "gpt-4o-mini"
-          ],
-          "description": "Default OpenAI model to use for generating PR summaries"
+          "description": "Default OpenAI model to use for generating PR summaries. Use 'Refresh Available Models' command to update the list dynamically."
         },
         "prSummary.defaultTemplate": {
           "type": "string",

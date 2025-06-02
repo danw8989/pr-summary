@@ -7,6 +7,7 @@ import { HistoryManager } from "../utils/historyManager";
 import { PrSummaryTreeProvider } from "./prSummaryTreeProvider";
 import { PrSummaryResultProvider } from "./prSummaryResultsView";
 import { AutoPostService } from "../services/AutoPostService";
+import { ModelService } from "../services/ModelService";
 import {
   AUTO_POST_SETTINGS,
   type AutoPostState,
@@ -183,7 +184,20 @@ export class PrSummaryCommands {
         apiKey,
         vscode.ConfigurationTarget.Global
       );
+
       vscode.window.showInformationMessage("OpenAI API Key saved successfully");
+
+      // Automatically refresh available models after configuring API key
+      const shouldRefreshModels = await vscode.window.showInformationMessage(
+        "Would you like to refresh the available OpenAI models now?",
+        "Yes",
+        "Later"
+      );
+
+      if (shouldRefreshModels === "Yes") {
+        await this.refreshAvailableModels();
+      }
+
       this._treeProvider.refresh();
     }
   }
@@ -685,7 +699,7 @@ export class PrSummaryCommands {
 
           const apiKey =
             config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
-          const model = config.get<string>("defaultModel", "gpt-4");
+          const model = await ModelService.getCurrentModel(apiKey);
 
           if (!apiKey) {
             throw new Error("OpenAI API Key not configured");
@@ -1659,5 +1673,203 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to load commit details: ${error}`);
     }
+  }
+
+  async refreshAvailableModels(): Promise<void> {
+    try {
+      const config = vscode.workspace.getConfiguration("prSummary");
+      const apiKey =
+        config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
+
+      if (!apiKey) {
+        vscode.window
+          .showWarningMessage(
+            "OpenAI API Key not configured. Please configure it first.",
+            "Configure API Key"
+          )
+          .then((selection) => {
+            if (selection === "Configure API Key") {
+              this.configureApiKey();
+            }
+          });
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Refreshing OpenAI Models",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({
+            increment: 0,
+            message: "Fetching available models from OpenAI...",
+          });
+
+          const result = await ModelService.refreshAndUpdateModels(apiKey);
+
+          if (result.success && result.models) {
+            progress.report({
+              increment: 100,
+              message: "Models updated successfully!",
+            });
+            vscode.window
+              .showInformationMessage(
+                `✅ Found ${
+                  result.models.length
+                } available models: ${result.models.slice(0, 3).join(", ")}${
+                  result.models.length > 3 ? "..." : ""
+                }`,
+                "View Settings"
+              )
+              .then((selection) => {
+                if (selection === "View Settings") {
+                  vscode.commands.executeCommand("prSummary.openSettings");
+                }
+              });
+            this._treeProvider.refresh();
+          } else {
+            throw new Error(result.error || "Failed to update models");
+          }
+        }
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to refresh models: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  async selectModel(): Promise<void> {
+    try {
+      const config = vscode.workspace.getConfiguration("prSummary");
+      const apiKey =
+        config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
+
+      if (!apiKey) {
+        vscode.window
+          .showWarningMessage(
+            "OpenAI API Key not configured. Please configure it first.",
+            "Configure API Key"
+          )
+          .then((selection) => {
+            if (selection === "Configure API Key") {
+              this.configureApiKey();
+            }
+          });
+        return;
+      }
+
+      const currentModel = config.get<string>("defaultModel", "gpt-4o-mini");
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Loading Available Models",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({
+            increment: 0,
+            message: "Fetching models from OpenAI...",
+          });
+
+          const availableModels = await ModelService.getAvailableModels(apiKey);
+
+          progress.report({
+            increment: 100,
+            message: "Models loaded!",
+          });
+
+          if (availableModels.length === 0) {
+            vscode.window
+              .showWarningMessage(
+                "No models available. Try refreshing the models list first.",
+                "Refresh Models"
+              )
+              .then((selection) => {
+                if (selection === "Refresh Models") {
+                  this.refreshAvailableModels();
+                }
+              });
+            return;
+          }
+
+          const quickPick = vscode.window.createQuickPick();
+          quickPick.title = "Select OpenAI Model";
+          quickPick.placeholder =
+            "Choose the model for generating PR summaries";
+
+          // Create items with current selection marked
+          quickPick.items = availableModels.map((model) => ({
+            label: model,
+            detail:
+              model === currentModel ? "✅ Currently selected" : undefined,
+            description: this.getModelDescription(model),
+          }));
+
+          quickPick.onDidChangeSelection((selection) => {
+            if (selection[0]) {
+              const selectedModel = selection[0].label;
+
+              config
+                .update(
+                  "defaultModel",
+                  selectedModel,
+                  vscode.ConfigurationTarget.Global
+                )
+                .then(() => {
+                  vscode.window.showInformationMessage(
+                    `✅ Default model set to: ${selectedModel}`
+                  );
+                  this._treeProvider.refresh();
+                });
+
+              quickPick.hide();
+            }
+          });
+
+          quickPick.onDidHide(() => quickPick.dispose());
+          quickPick.show();
+        }
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to load models: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  private getModelDescription(model: string): string {
+    // Provide helpful descriptions for common models
+    const descriptions: { [key: string]: string } = {
+      "gpt-4o": "🚀 Most capable, higher cost",
+      "gpt-4o-mini": "⚡ Fast & cost-effective",
+      "gpt-4-turbo": "🎯 High performance",
+      "gpt-4": "🔍 High quality, slower",
+      "gpt-3.5-turbo": "💨 Fast & affordable",
+      "o1-preview": "🧠 Advanced reasoning",
+      "o1-mini": "🧠 Reasoning optimized",
+    };
+
+    // Check for partial matches for models with versions/dates
+    for (const [key, desc] of Object.entries(descriptions)) {
+      if (model.includes(key)) {
+        return desc;
+      }
+    }
+
+    // Default descriptions based on model patterns
+    if (model.includes("gpt-4")) return "🔍 GPT-4 family";
+    if (model.includes("gpt-3.5")) return "💨 GPT-3.5 family";
+    if (model.includes("o1")) return "🧠 o1 reasoning family";
+    if (model.includes("o3")) return "⚡ o3 family";
+
+    return "🤖 OpenAI model";
   }
 }

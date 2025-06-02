@@ -108,6 +108,12 @@ function registerCommands(
     vscode.commands.registerCommand("prSummary.showCommitDetails", () =>
       commandsHandler.showCommitDetails()
     ),
+    vscode.commands.registerCommand("prSummary.refreshAvailableModels", () =>
+      commandsHandler.refreshAvailableModels()
+    ),
+    vscode.commands.registerCommand("prSummary.selectModel", () =>
+      commandsHandler.selectModel()
+    ),
   ];
 
   context.subscriptions.push(...commands);

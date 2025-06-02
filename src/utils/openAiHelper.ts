@@ -135,4 +135,57 @@ export class OpenAIHelper {
       return FALLBACK_MODELS;
     }
   }
+
+  /**
+   * Update VS Code configuration with dynamically fetched models
+   */
+  static async updateAvailableModelsConfiguration(
+    apiKey: string
+  ): Promise<{ success: boolean; models?: string[]; error?: string }> {
+    try {
+      const models = await this.fetchChatModels(apiKey);
+
+      if (models.length === 0) {
+        return {
+          success: false,
+          error: "No suitable models found",
+        };
+      }
+
+      // Get current configuration
+      const config = vscode.workspace.getConfiguration("prSummary");
+      const currentDefaultModel = config.get<string>("defaultModel");
+
+      // Update the configuration schema dynamically
+      const configurationContributions =
+        vscode.extensions.getExtension("InZarys.pr-summary")?.packageJSON
+          ?.contributes?.configuration;
+
+      if (configurationContributions?.properties?.["prSummary.defaultModel"]) {
+        configurationContributions.properties["prSummary.defaultModel"].enum =
+          models;
+
+        // If current default model is not in the new list, update to first available
+        if (currentDefaultModel && !models.includes(currentDefaultModel)) {
+          await config.update(
+            "defaultModel",
+            models[0],
+            vscode.ConfigurationTarget.Global
+          );
+        }
+      }
+
+      return {
+        success: true,
+        models: models,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to update models configuration: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
+  }
 }

@@ -81,6 +81,7 @@ export class PrSummaryTreeProvider
 
     const includeDiffs = config.get<boolean>("includeDiffs", true);
     const additionalPrompt = config.get<string>("additionalPrompt", "");
+    const currentModel = config.get<string>("defaultModel", "gpt-4o-mini");
 
     const autoPostEnabled = config.get<boolean>("autoPost.enabled", false);
     const autoPostState = config.get<string>("autoPost.defaultState", "ready");
@@ -94,47 +95,43 @@ export class PrSummaryTreeProvider
       auto: "Auto-detect",
     };
 
+    // Check if we're ready to generate
+    const canGenerate = hasApiKey;
+    const hasBasicSetup = hasApiKey; // Can expand this logic later
+
     this._data = [
+      // Main Action Section - Most prominent
       {
-        id: "configuration",
-        label: "Configuration",
-        iconPath: new vscode.ThemeIcon("gear"),
-        contextValue: "configSection",
+        id: "quickActions",
+        label: "🚀 Quick Actions",
+        iconPath: new vscode.ThemeIcon("rocket"),
+        contextValue: "quickActionsSection",
         children: [
           {
-            id: "apiKeyStatus",
-            label: "OpenAI API Key",
-            description: getMaskedConfigurationStatus(openaiApiKey),
-            iconPath: new vscode.ThemeIcon(hasApiKey ? "check" : "warning"),
-            contextValue: "apiKey",
-            command: !hasApiKey
+            id: "generateSummary",
+            label: canGenerate
+              ? "✨ Generate PR Summary"
+              : "⚠️ Configure API Key First",
+            description: canGenerate ? "Ready to generate" : "Setup required",
+            iconPath: new vscode.ThemeIcon(
+              canGenerate ? "play-circle" : "warning"
+            ),
+            contextValue: "generateSummary",
+            command: canGenerate
               ? {
+                  command: "pr-summary.generatePrSummary",
+                  title: "Generate Summary",
+                }
+              : {
                   command: "prSummary.configureApiKey",
                   title: "Configure API Key",
-                }
-              : undefined,
-          },
-          {
-            id: "jiraStatus",
-            label: "JIRA Configuration",
-            description: hasJiraConfig
-              ? `URL: ${getMaskedConfigurationStatus(
-                  jiraUrl
-                )}, Token: ${getMaskedConfigurationStatus(jiraApiToken)}`
-              : "Not configured",
-            iconPath: new vscode.ThemeIcon(hasJiraConfig ? "check" : "info"),
-            contextValue: "jiraConfig",
-            command: !hasJiraConfig
-              ? {
-                  command: "prSummary.configureJira",
-                  title: "Configure JIRA",
-                }
-              : undefined,
+                },
           },
           {
             id: "openSettings",
-            label: "Open Extension Settings",
-            iconPath: new vscode.ThemeIcon("settings"),
+            label: "⚙️ Extension Settings",
+            description: "Quick access to all settings",
+            iconPath: new vscode.ThemeIcon("settings-gear"),
             contextValue: "openSettings",
             command: {
               command: "prSummary.openSettings",
@@ -143,27 +140,29 @@ export class PrSummaryTreeProvider
           },
         ],
       },
+
+      // Setup Section - Clear status indicators
       {
-        id: "generation",
-        label: "PR Summary Generation",
-        iconPath: new vscode.ThemeIcon("git-pull-request"),
-        contextValue: "generationSection",
+        id: "setup",
+        label: "📋 Setup & Configuration",
+        iconPath: new vscode.ThemeIcon("checklist"),
+        contextValue: "setupSection",
         children: [
           {
             id: "selectBranch",
-            label: "Source Branch (Your Changes)",
-            description: "Not selected",
+            label: "📂 Source Branch",
+            description: "Select your changes branch",
             iconPath: new vscode.ThemeIcon("git-branch"),
             contextValue: "selectBranch",
             command: {
               command: "prSummary.selectBranch",
-              title: "Select Branch",
+              title: "Select Source Branch",
             },
           },
           {
             id: "selectTargetBranch",
-            label: "Target Branch (Base/Main)",
-            description: "Not selected",
+            label: "🎯 Target Branch",
+            description: "Select base/main branch",
             iconPath: new vscode.ThemeIcon("git-merge"),
             contextValue: "selectTargetBranch",
             command: {
@@ -172,20 +171,9 @@ export class PrSummaryTreeProvider
             },
           },
           {
-            id: "selectJira",
-            label: "Select JIRA Ticket (Optional)",
-            iconPath: new vscode.ThemeIcon("link"),
-            contextValue: "selectJira",
-            command: hasJiraConfig
-              ? {
-                  command: "pr-summary.selectJiraTicket",
-                  title: "Select JIRA Ticket",
-                }
-              : undefined,
-          },
-          {
             id: "selectTemplate",
-            label: "Select Template",
+            label: "📝 Template",
+            description: "Choose summary template",
             iconPath: new vscode.ThemeIcon("file-text"),
             contextValue: "selectTemplate",
             command: {
@@ -194,31 +182,129 @@ export class PrSummaryTreeProvider
             },
           },
           {
-            id: "generateSummary",
-            label: "Generate PR Summary",
-            iconPath: new vscode.ThemeIcon("play"),
-            contextValue: "generateSummary",
+            id: "selectJira",
+            label: "🔗 JIRA Ticket (Optional)",
+            description: hasJiraConfig
+              ? "Link to ticket"
+              : "Configure JIRA first",
+            iconPath: new vscode.ThemeIcon(
+              hasJiraConfig ? "link" : "link-external"
+            ),
+            contextValue: "selectJira",
+            command: hasJiraConfig
+              ? {
+                  command: "pr-summary.selectJiraTicket",
+                  title: "Select JIRA Ticket",
+                }
+              : {
+                  command: "prSummary.configureJira",
+                  title: "Configure JIRA",
+                },
+          },
+          {
+            id: "refreshModels",
+            label: "🔄 Refresh Available Models",
+            description: hasApiKey
+              ? "Update OpenAI models list"
+              : "API key required",
+            iconPath: new vscode.ThemeIcon("sync"),
+            contextValue: "refreshModels",
             command: hasApiKey
               ? {
-                  command: "pr-summary.generatePrSummary",
-                  title: "Generate Summary",
+                  command: "prSummary.refreshAvailableModels",
+                  title: "Refresh Available Models",
                 }
-              : undefined,
+              : {
+                  command: "prSummary.configureApiKey",
+                  title: "Configure API Key",
+                },
+          },
+          {
+            id: "selectModel",
+            label: "🤖 Select OpenAI Model",
+            description: hasApiKey
+              ? "Choose from available models"
+              : "API key required",
+            iconPath: new vscode.ThemeIcon("list-selection"),
+            contextValue: "selectModel",
+            command: hasApiKey
+              ? {
+                  command: "prSummary.selectModel",
+                  title: "Select Model",
+                }
+              : {
+                  command: "prSummary.configureApiKey",
+                  title: "Configure API Key",
+                },
           },
         ],
       },
+
+      // API Configuration
+      {
+        id: "apiConfig",
+        label: "🔑 API Configuration",
+        iconPath: new vscode.ThemeIcon("key"),
+        contextValue: "apiConfigSection",
+        children: [
+          {
+            id: "apiKeyStatus",
+            label: "OpenAI API Key",
+            description: hasApiKey ? "✅ Configured" : "❌ Not configured",
+            iconPath: new vscode.ThemeIcon(hasApiKey ? "check-all" : "x"),
+            contextValue: "apiKey",
+            command: {
+              command: "prSummary.configureApiKey",
+              title: hasApiKey ? "Update API Key" : "Configure API Key",
+            },
+          },
+          {
+            id: "jiraStatus",
+            label: "JIRA Integration",
+            description: hasJiraConfig
+              ? "✅ Configured"
+              : "❌ Optional - Not configured",
+            iconPath: new vscode.ThemeIcon(
+              hasJiraConfig ? "check-all" : "circle"
+            ),
+            contextValue: "jiraConfig",
+            command: {
+              command: "prSummary.configureJira",
+              title: hasJiraConfig ? "Update JIRA Config" : "Configure JIRA",
+            },
+          },
+          {
+            id: "currentModel",
+            label: "Current Model",
+            description: hasApiKey ? `🤖 ${currentModel}` : "❌ No API key",
+            iconPath: new vscode.ThemeIcon(hasApiKey ? "list-selection" : "x"),
+            contextValue: "currentModel",
+            command: hasApiKey
+              ? {
+                  command: "prSummary.selectModel",
+                  title: "Select Model",
+                }
+              : {
+                  command: "prSummary.configureApiKey",
+                  title: "Configure API Key",
+                },
+          },
+        ],
+      },
+
+      // Generation Options
       {
         id: "options",
-        label: "Generation Options",
-        iconPath: new vscode.ThemeIcon("settings-gear"),
+        label: "⚡ Generation Options",
+        iconPath: new vscode.ThemeIcon("settings"),
         contextValue: "optionsSection",
         children: [
           {
             id: "toggleDiffs",
             label: "Include Code Diffs",
-            description: includeDiffs ? "Enabled" : "Disabled",
+            description: includeDiffs ? "✅ Enabled" : "❌ Disabled",
             iconPath: new vscode.ThemeIcon(
-              includeDiffs ? "check" : "circle-slash"
+              includeDiffs ? "diff" : "diff-ignored"
             ),
             contextValue: "toggleDiffs",
             command: {
@@ -228,29 +314,33 @@ export class PrSummaryTreeProvider
           },
           {
             id: "setAdditionalPrompt",
-            label: "Custom Prompt Instructions",
-            description: additionalPrompt ? "Set" : "None",
+            label: "Custom Instructions",
+            description: additionalPrompt
+              ? "✏️ Custom prompt set"
+              : "📄 Use default",
             iconPath: new vscode.ThemeIcon("edit"),
             contextValue: "setAdditionalPrompt",
             command: {
               command: "prSummary.setAdditionalPrompt",
-              title: "Set Additional Prompt",
+              title: "Set Custom Instructions",
             },
           },
         ],
       },
+
+      // Auto-Post Settings
       {
         id: "autoPost",
-        label: "Auto-Post Settings",
+        label: "☁️ Auto-Post to GitHub/GitLab",
         iconPath: new vscode.ThemeIcon("cloud-upload"),
         contextValue: "autoPostSection",
         children: [
           {
             id: "autoPostEnabled",
-            label: "Auto-Post to GitHub/GitLab",
-            description: autoPostEnabled ? "Enabled" : "Disabled",
+            label: "Auto-Post Feature",
+            description: autoPostEnabled ? "✅ Enabled" : "❌ Disabled",
             iconPath: new vscode.ThemeIcon(
-              autoPostEnabled ? "check" : "circle-slash"
+              autoPostEnabled ? "check-all" : "circle"
             ),
             contextValue: "autoPostEnabled",
             command: {
@@ -261,7 +351,7 @@ export class PrSummaryTreeProvider
           {
             id: "configureGitHub",
             label: "GitHub Token",
-            description: getMaskedConfigurationStatus(githubToken),
+            description: githubToken ? "✅ Configured" : "❌ Not configured",
             iconPath: new vscode.ThemeIcon("mark-github"),
             contextValue: "configureGitHub",
             command: {
@@ -272,22 +362,12 @@ export class PrSummaryTreeProvider
           {
             id: "configureGitLab",
             label: "GitLab Token",
-            description: getMaskedConfigurationStatus(gitlabToken),
+            description: gitlabToken ? "✅ Configured" : "❌ Not configured",
             iconPath: new vscode.ThemeIcon("gitlab"),
             contextValue: "configureGitLab",
             command: {
               command: "prSummary.configureGitLab",
               title: "Configure GitLab",
-            },
-          },
-          {
-            id: "testConnection",
-            label: "Test Connection",
-            iconPath: new vscode.ThemeIcon("debug-start"),
-            contextValue: "testConnection",
-            command: {
-              command: "prSummary.testConnection",
-              title: "Test Connection",
             },
           },
           {
@@ -304,51 +384,38 @@ export class PrSummaryTreeProvider
               title: "Select Default State",
             },
           },
-        ],
-      },
-      {
-        id: "customTemplates",
-        label: "Custom Templates",
-        iconPath: new vscode.ThemeIcon("file-text"),
-        contextValue: "customTemplatesSection",
-        children: [
           {
-            id: "createCustomTemplate",
-            label: "Create New Template",
-            iconPath: new vscode.ThemeIcon("add"),
-            contextValue: "createCustomTemplate",
+            id: "testConnection",
+            label: "Test Connection",
+            description: "Verify GitHub/GitLab setup",
+            iconPath: new vscode.ThemeIcon("debug-start"),
+            contextValue: "testConnection",
             command: {
-              command: "prSummary.createCustomTemplate",
-              title: "Create Custom Template",
-            },
-          },
-          {
-            id: "templateInfo",
-            label: "Template Storage Info",
-            iconPath: new vscode.ThemeIcon("info"),
-            contextValue: "templateInfo",
-            command: {
-              command: "prSummary.showTemplateInfo",
-              title: "Show Template Info",
+              command: "prSummary.testConnection",
+              title: "Test Connection",
             },
           },
         ],
       },
+
+      // Commit Preview
       {
         id: "commitPreview",
-        label: "Commit Preview",
+        label: "📊 Commit Preview",
         iconPath: new vscode.ThemeIcon("git-commit"),
         contextValue: "commitPreviewSection",
         children: [
           {
             id: "commitPreviewPlaceholder",
-            label: "Select source and target branches to preview commits",
+            label: "Select branches to preview commits",
+            description: "Shows what will be included in PR",
             iconPath: new vscode.ThemeIcon("info"),
             contextValue: "commitPreviewPlaceholder",
           },
           {
             id: "refreshCommitPreview",
-            label: "Refresh Preview",
+            label: "🔄 Refresh Preview",
+            description: "Update commit list",
             iconPath: new vscode.ThemeIcon("refresh"),
             contextValue: "refreshCommitPreview",
             command: {
@@ -358,9 +425,43 @@ export class PrSummaryTreeProvider
           },
         ],
       },
+
+      // Templates
+      {
+        id: "customTemplates",
+        label: "📄 Custom Templates",
+        iconPath: new vscode.ThemeIcon("file-text"),
+        contextValue: "customTemplatesSection",
+        children: [
+          {
+            id: "createCustomTemplate",
+            label: "➕ Create New Template",
+            description: "Add custom PR template",
+            iconPath: new vscode.ThemeIcon("add"),
+            contextValue: "createCustomTemplate",
+            command: {
+              command: "prSummary.createCustomTemplate",
+              title: "Create Custom Template",
+            },
+          },
+          {
+            id: "templateInfo",
+            label: "📋 Template Storage Info",
+            description: "Manage template files",
+            iconPath: new vscode.ThemeIcon("info"),
+            contextValue: "templateInfo",
+            command: {
+              command: "prSummary.showTemplateInfo",
+              title: "Show Template Info",
+            },
+          },
+        ],
+      },
+
+      // History
       {
         id: "history",
-        label: "Recent Summaries",
+        label: "📚 Recent Summaries",
         iconPath: new vscode.ThemeIcon("history"),
         contextValue: "historySection",
         children: [],
@@ -393,7 +494,7 @@ export class PrSummaryTreeProvider
     type: "branch" | "targetBranch" | "jira" | "template",
     value: string
   ): void {
-    const section = this._data.find((item) => item.id === "generation");
+    const section = this._data.find((item) => item.id === "setup");
     if (!section?.children) return;
 
     let targetId: string;
@@ -412,7 +513,15 @@ export class PrSummaryTreeProvider
     const item = section.children.find((child) => child.id === targetId);
 
     if (item) {
-      item.description = value;
+      if (type === "branch") {
+        item.description = `📂 ${value}`;
+      } else if (type === "targetBranch") {
+        item.description = `🎯 ${value}`;
+      } else if (type === "jira") {
+        item.description = `🔗 ${value}`;
+      } else if (type === "template") {
+        item.description = `📝 ${value}`;
+      }
       this._onDidChangeTreeData.fire();
     }
   }
@@ -486,7 +595,7 @@ export class PrSummaryTreeProvider
     currentBranch?: string,
     defaultTarget?: string
   ): Promise<void> {
-    const section = this._data.find((item) => item.id === "generation");
+    const section = this._data.find((item) => item.id === "setup");
     if (!section?.children) return;
 
     // Update source branch if provided
@@ -494,8 +603,11 @@ export class PrSummaryTreeProvider
       const sourceBranchItem = section.children.find(
         (child) => child.id === "selectBranch"
       );
-      if (sourceBranchItem && sourceBranchItem.description === "Not selected") {
-        sourceBranchItem.description = `${currentBranch} (auto-detected)`;
+      if (
+        sourceBranchItem &&
+        sourceBranchItem.description === "Select your changes branch"
+      ) {
+        sourceBranchItem.description = `📂 ${currentBranch} (auto-detected)`;
       }
     }
 
@@ -504,8 +616,11 @@ export class PrSummaryTreeProvider
       const targetBranchItem = section.children.find(
         (child) => child.id === "selectTargetBranch"
       );
-      if (targetBranchItem && targetBranchItem.description === "Not selected") {
-        targetBranchItem.description = `${defaultTarget} (auto-detected)`;
+      if (
+        targetBranchItem &&
+        targetBranchItem.description === "Select base/main branch"
+      ) {
+        targetBranchItem.description = `🎯 ${defaultTarget} (auto-detected)`;
       }
     }
 
@@ -527,7 +642,8 @@ export class PrSummaryTreeProvider
     // Always include refresh button
     const refreshButton = {
       id: "refreshCommitPreview",
-      label: "Refresh Preview",
+      label: "🔄 Refresh Preview",
+      description: "Update commit list",
       iconPath: new vscode.ThemeIcon("refresh"),
       contextValue: "refreshCommitPreview",
       command: {
@@ -538,7 +654,8 @@ export class PrSummaryTreeProvider
 
     const viewDetailsButton = {
       id: "viewCommitDetails",
-      label: "View Full Details",
+      label: "👁️ View Full Details",
+      description: "Open detailed commit view",
       iconPath: new vscode.ThemeIcon("eye"),
       contextValue: "viewCommitDetails",
       command: {
@@ -552,7 +669,8 @@ export class PrSummaryTreeProvider
       commitPreviewSection.children = [
         {
           id: "commitPreviewPlaceholder",
-          label: "Select source and target branches to preview commits",
+          label: "Select branches to preview commits",
+          description: "Shows what will be included in PR",
           iconPath: new vscode.ThemeIcon("info"),
           contextValue: "commitPreviewPlaceholder",
         },
@@ -563,7 +681,8 @@ export class PrSummaryTreeProvider
       commitPreviewSection.children = [
         {
           id: "commitPreviewLoading",
-          label: "Loading commit preview...",
+          label: "🔄 Loading commit preview...",
+          description: `Checking ${sourceBranch} → ${targetBranch}`,
           iconPath: new vscode.ThemeIcon("loading~spin"),
           contextValue: "commitPreviewLoading",
         },
@@ -598,7 +717,8 @@ export class PrSummaryTreeProvider
 
     const refreshButton = {
       id: "refreshCommitPreview",
-      label: "Refresh Preview",
+      label: "🔄 Refresh Preview",
+      description: "Update commit list",
       iconPath: new vscode.ThemeIcon("refresh"),
       contextValue: "refreshCommitPreview",
       command: {
@@ -609,7 +729,8 @@ export class PrSummaryTreeProvider
 
     const viewDetailsButton = {
       id: "viewCommitDetails",
-      label: "View Full Details",
+      label: "👁️ View Full Details",
+      description: "Open detailed commit view",
       iconPath: new vscode.ThemeIcon("eye"),
       contextValue: "viewCommitDetails",
       command: {
@@ -628,10 +749,11 @@ export class PrSummaryTreeProvider
         commitPreviewSection.children = [
           {
             id: "commitPreviewInfo",
-            label: `${commits.length} commit${
+            label: `📊 ${commits.length} commit${
               commits.length === 1 ? "" : "s"
-            } between ${targetBranch} and ${sourceBranch}`,
-            iconPath: new vscode.ThemeIcon("info"),
+            } found`,
+            description: `${sourceBranch} → ${targetBranch}`,
+            iconPath: new vscode.ThemeIcon("git-commit"),
             contextValue: "commitPreviewInfo",
           },
           refreshButton,
@@ -644,14 +766,15 @@ export class PrSummaryTreeProvider
               label: title + (commit.length > 80 ? "..." : ""),
               iconPath: new vscode.ThemeIcon("git-commit"),
               contextValue: "commitPreviewItem",
-              description: index === 0 ? "latest" : undefined,
+              description: index === 0 ? "🆕 Latest" : `#${index + 1}`,
             };
           }),
           ...(commits.length > 8
             ? [
                 {
                   id: "commitPreviewMore",
-                  label: `... and ${commits.length - 8} more commits`,
+                  label: `📋 ... and ${commits.length - 8} more commits`,
+                  description: "Click 'View Full Details' to see all",
                   iconPath: new vscode.ThemeIcon("ellipsis"),
                   contextValue: "commitPreviewMore",
                 },
@@ -662,7 +785,8 @@ export class PrSummaryTreeProvider
         commitPreviewSection.children = [
           {
             id: "commitPreviewEmpty",
-            label: "No commits found between these branches",
+            label: "❌ No commits found",
+            description: "Branches are identical or invalid",
             iconPath: new vscode.ThemeIcon("warning"),
             contextValue: "commitPreviewEmpty",
           },
@@ -674,7 +798,8 @@ export class PrSummaryTreeProvider
       commitPreviewSection.children = [
         {
           id: "commitPreviewEmpty",
-          label: "No commits found between these branches",
+          label: "❌ No commits found",
+          description: "Branches are identical or invalid",
           iconPath: new vscode.ThemeIcon("warning"),
           contextValue: "commitPreviewEmpty",
         },
@@ -697,7 +822,8 @@ export class PrSummaryTreeProvider
 
     const refreshButton = {
       id: "refreshCommitPreview",
-      label: "Refresh Preview",
+      label: "🔄 Refresh Preview",
+      description: "Update commit list",
       iconPath: new vscode.ThemeIcon("refresh"),
       contextValue: "refreshCommitPreview",
       command: {
@@ -708,7 +834,8 @@ export class PrSummaryTreeProvider
 
     const viewDetailsButton = {
       id: "viewCommitDetails",
-      label: "View Full Details",
+      label: "👁️ View Full Details",
+      description: "Open detailed commit view",
       iconPath: new vscode.ThemeIcon("eye"),
       contextValue: "viewCommitDetails",
       command: {
@@ -720,7 +847,8 @@ export class PrSummaryTreeProvider
     commitPreviewSection.children = [
       {
         id: "commitPreviewError",
-        label: `Error: ${error}`,
+        label: `❌ Error: ${error}`,
+        description: "Check branch names and try again",
         iconPath: new vscode.ThemeIcon("error"),
         contextValue: "commitPreviewError",
       },
