@@ -400,38 +400,60 @@ export class GitHelper {
   }
 
   /**
-   * Fallback method to get minimal commit messages when hitting buffer limits
+   * Get minimal commit messages (just subjects) for fallback when buffer limits hit
    */
   private static async getMinimalCommitMessages(
     sourceBranch: string,
     targetBranch: string,
     maxCommits: number = 10
   ): Promise<string> {
-    console.log("Getting minimal commit messages as fallback...");
-
     const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
-    const compareSpec = `${resolvedTargetBranch}..${sourceBranch}`;
 
-    const command = `git log --max-count=${maxCommits} --pretty=format:"%s" ${compareSpec}`;
+    const command = `git log ${resolvedTargetBranch}..${sourceBranch} --pretty=format:"%s" -n ${maxCommits}`;
 
+    const { stdout } = await this.executeInWorkspaceRoot(command, {
+      maxBuffer: 1024 * 1024, // 1MB should be enough for just commit subjects
+    });
+
+    if (!stdout.trim()) {
+      return "No commits found between branches.";
+    }
+
+    const lines = stdout
+      .trim()
+      .split("\n")
+      .map((line, index) => `${index + 1}. ${line}`)
+      .join("\n");
+
+    return `Commits from ${sourceBranch} (not in ${resolvedTargetBranch}):\n${lines}`;
+  }
+
+  /**
+   * Get the latest commit message from a specific branch
+   */
+  static async getLatestCommitMessage(
+    branchName: string
+  ): Promise<string | null> {
     try {
+      // Clean branch name (remove origin/ prefix if present)
+      const cleanBranchName = branchName.replace(
+        /^(origin\/|remotes\/origin\/)/,
+        ""
+      );
+
+      const command = `git log ${cleanBranchName} --pretty=format:"%s%n%n%b" -n 1`;
+
       const { stdout } = await this.executeInWorkspaceRoot(command, {
-        maxBuffer: 1024 * 1024,
-      }); // 1MB should be enough for commit titles
+        maxBuffer: 1024 * 1024, // 1MB should be enough for one commit message
+      });
 
-      if (!stdout.trim()) {
-        return "No commits found between branches.";
-      }
-
-      const commits = stdout.trim().split("\n");
-      return `Recent commits (${commits.length}):\n\n${commits
-        .map((commit) => `• ${commit}`)
-        .join(
-          "\n"
-        )}\n\nNote: Detailed diffs were too large to display. This summary shows commit titles only.`;
+      return stdout.trim() || null;
     } catch (error) {
-      console.error(`Even minimal commit fetch failed: ${error}`);
-      return `Unable to fetch commit details due to repository size. Please ensure branches ${sourceBranch} and ${targetBranch} exist and have different commit histories.`;
+      console.warn(
+        `Failed to get latest commit message for ${branchName}:`,
+        error
+      );
+      return null;
     }
   }
 

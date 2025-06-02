@@ -53,6 +53,88 @@ interface ErrorResponse {
 
 export class AutoPostService {
   /**
+   * Generate a sensible title from commit messages or branch name
+   */
+  private async generateTitle(sourceBranch: string): Promise<string> {
+    try {
+      // Try to get the latest commit message from the source branch
+      const latestCommit = await GitHelper.getLatestCommitMessage(sourceBranch);
+
+      if (latestCommit) {
+        // Clean up the commit message to make it PR-title friendly
+        const cleanTitle = this.cleanCommitMessageForTitle(latestCommit);
+        if (cleanTitle && cleanTitle.length > 10) {
+          return cleanTitle;
+        }
+      }
+
+      // Fallback to branch name
+      return this.generateTitleFromBranch(sourceBranch);
+    } catch {
+      // Final fallback to branch name
+      return this.generateTitleFromBranch(sourceBranch);
+    }
+  }
+
+  /**
+   * Clean commit message to make it suitable as a PR title
+   */
+  private cleanCommitMessageForTitle(commitMessage: string): string {
+    // Take only the first line (subject) of the commit message
+    const firstLine = commitMessage.split("\n")[0].trim();
+
+    // Remove common prefixes that aren't suitable for PR titles
+    const prefixesToRemove = [
+      /^(fix|feat|chore|docs|style|refactor|test|perf|ci|build):\s*/i,
+      /^(wip|temp|tmp):\s*/i,
+      /^merge\s+/i,
+      /^revert\s+/i,
+    ];
+
+    let cleaned = firstLine;
+    for (const prefix of prefixesToRemove) {
+      cleaned = cleaned.replace(prefix, "");
+    }
+
+    // Capitalize first letter
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+
+    // Remove trailing periods
+    cleaned = cleaned.replace(/\.$/, "");
+
+    return cleaned.trim();
+  }
+
+  /**
+   * Generate title from branch name
+   */
+  private generateTitleFromBranch(branchName: string): string {
+    // Remove common prefixes
+    let title = branchName.replace(
+      /^(feature|bugfix|hotfix|fix|feat|chore)\//,
+      ""
+    );
+
+    // Remove origin/ prefix if present
+    title = title.replace(/^(origin\/|remotes\/origin\/)/, "");
+
+    // Replace dashes and underscores with spaces
+    title = title.replace(/[-_]/g, " ");
+
+    // Remove issue numbers in common formats
+    title = title.replace(/^\d+[-_]/, ""); // Remove leading "123-" or "123_"
+    title = title.replace(/[-_]\d+$/, ""); // Remove trailing "-123" or "_123"
+
+    // Capitalize each word
+    title = title.replace(/\b\w/g, (l) => l.toUpperCase());
+
+    // Clean up extra spaces
+    title = title.replace(/\s+/g, " ").trim();
+
+    return title || "Update from " + branchName;
+  }
+
+  /**
    * Auto-post PR summary to the detected platform
    */
   async autoPost(
@@ -63,12 +145,23 @@ export class AutoPostService {
     state: AutoPostState = "ready"
   ): Promise<AutoPostResult> {
     try {
+      // Generate a sensible title if none provided or if it's generic
+      let finalTitle = title;
+      if (
+        !title ||
+        title.trim() === "" ||
+        title.toLowerCase().includes("pr summary") ||
+        title.toLowerCase().includes("pull request")
+      ) {
+        finalTitle = await this.generateTitle(sourceBranch);
+      }
+
       // Detect platform from remote URL
       const platform = await this.detectPlatform();
 
       if (platform === "github") {
         return await this.postToGitHub(
-          title,
+          finalTitle,
           summary,
           sourceBranch,
           targetBranch,
@@ -76,7 +169,7 @@ export class AutoPostService {
         );
       } else if (platform === "gitlab") {
         return await this.postToGitLab(
-          title,
+          finalTitle,
           summary,
           sourceBranch,
           targetBranch,
@@ -639,39 +732,60 @@ export class AutoPostService {
    */
   private async getGitHubToken(): Promise<string | null> {
     const config = vscode.workspace.getConfiguration("prSummary");
+
+    // Try workspace-specific token first
     let token = config.get<string>("github.token");
 
     if (!token) {
-      // Try to get from VS Code secrets API
-      try {
-        token = await vscode.window.withProgress(
+      // Try global token as fallback
+      const globalConfig = vscode.workspace.getConfiguration("prSummary");
+      token = globalConfig.inspect<string>("github.token")?.globalValue;
+    }
+
+    if (!token) {
+      // Prompt user for token with option to save per-project or globally
+      const tokenInput = await vscode.window.showInputBox({
+        prompt: "Enter your GitHub Personal Access Token",
+        password: true,
+        placeHolder: "ghp_...",
+        ignoreFocusOut: true,
+      });
+
+      if (tokenInput) {
+        const scope = await vscode.window.showQuickPick(
+          [
+            {
+              label: "This Project Only",
+              detail: "Save token for this workspace only",
+              value: "workspace",
+            },
+            {
+              label: "All Projects (Global)",
+              detail: "Use this token for all GitHub projects",
+              value: "global",
+            },
+          ],
           {
-            location: vscode.ProgressLocation.Notification,
-            title: "Retrieving GitHub token...",
-          },
-          async () => {
-            return await vscode.workspace
-              .getConfiguration()
-              .get<string>("prSummary.github.token");
+            placeHolder: "Where should this token be saved?",
+            ignoreFocusOut: true,
           }
         );
-      } catch {
-        // Fallback to asking user to input token
-        token = await vscode.window.showInputBox({
-          prompt: "Enter your GitHub Personal Access Token",
-          password: true,
-          placeHolder: "ghp_...",
-          ignoreFocusOut: true,
-        });
 
-        if (token) {
-          // Save token to settings
+        if (scope?.value === "workspace") {
           await config.update(
             "github.token",
-            token,
+            tokenInput,
+            vscode.ConfigurationTarget.Workspace
+          );
+        } else {
+          await config.update(
+            "github.token",
+            tokenInput,
             vscode.ConfigurationTarget.Global
           );
         }
+
+        token = tokenInput;
       }
     }
 
@@ -683,39 +797,60 @@ export class AutoPostService {
    */
   private async getGitLabToken(): Promise<string | null> {
     const config = vscode.workspace.getConfiguration("prSummary");
+
+    // Try workspace-specific token first
     let token = config.get<string>("gitlab.token");
 
     if (!token) {
-      // Try to get from VS Code secrets API
-      try {
-        token = await vscode.window.withProgress(
+      // Try global token as fallback
+      const globalConfig = vscode.workspace.getConfiguration("prSummary");
+      token = globalConfig.inspect<string>("gitlab.token")?.globalValue;
+    }
+
+    if (!token) {
+      // Prompt user for token with option to save per-project or globally
+      const tokenInput = await vscode.window.showInputBox({
+        prompt: "Enter your GitLab Personal Access Token",
+        password: true,
+        placeHolder: "glpat-...",
+        ignoreFocusOut: true,
+      });
+
+      if (tokenInput) {
+        const scope = await vscode.window.showQuickPick(
+          [
+            {
+              label: "This Project Only",
+              detail: "Save token for this workspace only",
+              value: "workspace",
+            },
+            {
+              label: "All Projects (Global)",
+              detail: "Use this token for all GitLab projects",
+              value: "global",
+            },
+          ],
           {
-            location: vscode.ProgressLocation.Notification,
-            title: "Retrieving GitLab token...",
-          },
-          async () => {
-            return await vscode.workspace
-              .getConfiguration()
-              .get<string>("prSummary.gitlab.token");
+            placeHolder: "Where should this token be saved?",
+            ignoreFocusOut: true,
           }
         );
-      } catch {
-        // Fallback to asking user to input token
-        token = await vscode.window.showInputBox({
-          prompt: "Enter your GitLab Personal Access Token",
-          password: true,
-          placeHolder: "glpat-...",
-          ignoreFocusOut: true,
-        });
 
-        if (token) {
-          // Save token to settings
+        if (scope?.value === "workspace") {
           await config.update(
             "gitlab.token",
-            token,
+            tokenInput,
+            vscode.ConfigurationTarget.Workspace
+          );
+        } else {
+          await config.update(
+            "gitlab.token",
+            tokenInput,
             vscode.ConfigurationTarget.Global
           );
         }
+
+        token = tokenInput;
       }
     }
 
@@ -803,6 +938,17 @@ export class AutoPostService {
     targetBranch: string
   ): Promise<AutoPostResult> {
     try {
+      // Generate a sensible title if none provided or if it's generic
+      let finalTitle = title;
+      if (
+        !title ||
+        title.trim() === "" ||
+        title.toLowerCase().includes("pr summary") ||
+        title.toLowerCase().includes("pull request")
+      ) {
+        finalTitle = await this.generateTitle(sourceBranch);
+      }
+
       // Let user choose platform if multiple are available
       const platform = await this.selectPlatform();
 
@@ -819,7 +965,7 @@ export class AutoPostService {
 
       if (platform === "github") {
         return await this.postToGitHub(
-          title,
+          finalTitle,
           summary,
           sourceBranch,
           targetBranch,
@@ -827,7 +973,7 @@ export class AutoPostService {
         );
       } else if (platform === "gitlab") {
         return await this.postToGitLab(
-          title,
+          finalTitle,
           summary,
           sourceBranch,
           targetBranch,
@@ -941,5 +1087,75 @@ export class AutoPostService {
     );
 
     return stateChoice?.value || "ready";
+  }
+
+  /**
+   * Configure tokens for the current workspace
+   */
+  async configureTokens(): Promise<void> {
+    const platform = await vscode.window.showQuickPick(
+      [
+        {
+          label: "GitHub",
+          detail: "Configure GitHub Personal Access Token",
+          value: "github",
+        },
+        {
+          label: "GitLab",
+          detail: "Configure GitLab Personal Access Token",
+          value: "gitlab",
+        },
+      ],
+      {
+        placeHolder: "Select platform to configure",
+        ignoreFocusOut: true,
+      }
+    );
+
+    if (!platform) return;
+
+    const token = await vscode.window.showInputBox({
+      prompt: `Enter your ${platform.label} Personal Access Token`,
+      password: true,
+      placeHolder: platform.value === "github" ? "ghp_..." : "glpat-...",
+      ignoreFocusOut: true,
+    });
+
+    if (!token) return;
+
+    const scope = await vscode.window.showQuickPick(
+      [
+        {
+          label: "This Project Only",
+          detail: "Save token for this workspace only",
+          value: "workspace",
+        },
+        {
+          label: "All Projects (Global)",
+          detail: `Use this token for all ${platform.label} projects`,
+          value: "global",
+        },
+      ],
+      {
+        placeHolder: "Where should this token be saved?",
+        ignoreFocusOut: true,
+      }
+    );
+
+    if (!scope) return;
+
+    const config = vscode.workspace.getConfiguration("prSummary");
+    const configTarget =
+      scope.value === "workspace"
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+
+    await config.update(`${platform.value}.token`, token, configTarget);
+
+    const scopeText =
+      scope.value === "workspace" ? "this workspace" : "globally";
+    vscode.window.showInformationMessage(
+      `✅ ${platform.label} token configured for ${scopeText}`
+    );
   }
 }
