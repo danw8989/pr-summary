@@ -15,3 +15,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Modern UI/UX for all extension features
 
 ## [Unreleased]
+
+### Fixed
+- Changed diff generation to use consolidated branch comparison instead of individual commit diffs
+  - Now uses `git diff targetBranch...sourceBranch` for a single diff showing net changes
+  - Prevents issues with large temporary files that were added and later removed
+  - Significantly improves performance and reduces buffer overflow errors
+  - Maintains separate commit messages for context while showing unified diff

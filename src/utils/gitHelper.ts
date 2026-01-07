@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { exec } from "child_process";
 import { promisify } from "util";
-import * as path from "path";
 
 const execPromise = promisify(exec);
 
@@ -100,6 +99,7 @@ export class GitHelper {
 
   /**
    * Get commit messages with optional diffs between source and target branches
+   * When includeDiffs is true, this now returns commit messages + a single consolidated branch diff
    */
   static async getCommitMessagesWithDiff(
     sourceBranch: string,
@@ -114,71 +114,78 @@ export class GitHelper {
       throw new Error(validation.error);
     }
 
-    // First try with limited commits and appropriate buffer size
     try {
-      return await this.getCommitMessagesWithDiffInternal(
+      let result = "";
+      
+      // Get commit messages (without individual diffs)
+      const commitMessages = await this.getCommitMessagesOnly(
         sourceBranch,
         targetBranch,
-        includeDiffs,
         maxCommits
       );
+      
+      result = commitMessages;
+      
+      // If diffs are requested, get a single consolidated branch diff
+      if (includeDiffs && commitMessages.trim() !== "No commits found between branches.") {
+        result += "\n\n=== CONSOLIDATED BRANCH DIFF ===\n\n";
+        
+        try {
+          const branchDiff = await this.getBranchDiff(sourceBranch, targetBranch);
+          result += branchDiff;
+        } catch (diffError) {
+          console.error("Failed to get branch diff:", diffError);
+          result += "Failed to generate branch diff. The changes may be too large.";
+        }
+      }
+      
+      return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      // If we hit buffer limits, try fallback strategies
-      if (
-        errorMessage.includes("maxBuffer") ||
-        errorMessage.includes("MAXBUFFER")
-      ) {
-        console.warn("Hit buffer limit, trying fallback strategies...");
-
-        // Strategy 1: Reduce commits if we haven't already
-        if (maxCommits > 10) {
-          console.log(
-            `Retrying with fewer commits: ${Math.max(10, maxCommits / 2)}`
-          );
-          try {
-            return await this.getCommitMessagesWithDiffInternal(
-              sourceBranch,
-              targetBranch,
-              includeDiffs,
-              Math.max(10, Math.floor(maxCommits / 2))
-            );
-          } catch (retryError) {
-            console.warn(
-              "Still hitting buffer limits, trying without diffs..."
-            );
-          }
-        }
-
-        // Strategy 2: Remove diffs if included
-        if (includeDiffs) {
-          console.log("Retrying without diffs...");
-          try {
-            return await this.getCommitMessagesWithDiffInternal(
-              sourceBranch,
-              targetBranch,
-              false,
-              Math.min(maxCommits, 20)
-            );
-          } catch (retryError) {
-            console.warn(
-              "Still hitting buffer limits, trying minimal output..."
-            );
-          }
-        }
-
-        // Strategy 3: Get just commit titles (minimal output)
-        console.log("Using minimal commit output as final fallback...");
-        return await this.getMinimalCommitMessages(
+      // If we hit any errors, try minimal fallback
+      console.warn("Error getting commit messages, using minimal fallback:", error);
+      return await this.getMinimalCommitMessages(sourceBranch, targetBranch, 10);
+    }
+  }
+  
+  /**
+   * Get only commit messages (without diffs) between branches
+   */
+  private static async getCommitMessagesOnly(
+    sourceBranch: string,
+    targetBranch: string,
+    maxCommits: number
+  ): Promise<string> {
+    const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+    
+    const gitLogCommand = [
+      "git",
+      "log",
+      `--max-count=${maxCommits}`,
+      "--pretty=format:%s%n%n%b",
+      `${resolvedTargetBranch}..${sourceBranch}`,
+      "--",
+      "."
+    ].join(" ");
+    
+    console.log(`Getting commit messages: ${gitLogCommand}`);
+    
+    try {
+      const { stdout } = await this.executeInWorkspaceRoot(gitLogCommand, {
+        maxBuffer: 5 * 1024 * 1024, // 5MB for commit messages
+      });
+      
+      return stdout.trim() || "No commits found between branches.";
+    } catch (error) {
+      // If buffer overflow, try with fewer commits
+      if (maxCommits > 10) {
+        console.warn("Reducing commit count due to buffer limit");
+        return await this.getCommitMessagesOnly(
           sourceBranch,
           targetBranch,
-          10
+          Math.floor(maxCommits / 2)
         );
       }
-
-      // Re-throw other errors
+      
       throw error;
     }
   }
@@ -252,55 +259,6 @@ export class GitHelper {
     }
   }
 
-  /**
-   * Internal method to get commit messages with diffs
-   */
-  private static async getCommitMessagesWithDiffInternal(
-    sourceBranch: string,
-    targetBranch: string,
-    includeDiffs: boolean,
-    maxCommits: number
-  ): Promise<string> {
-    const gitLogCommand = [
-      "git",
-      "log",
-      `--max-count=${maxCommits}`,
-      "--pretty=format:%s%n%n%b",
-    ];
-
-    if (includeDiffs) {
-      gitLogCommand.push("-p");
-      // Limit diff context for large changes
-      gitLogCommand.push("--unified=3");
-    }
-
-    // Improve target branch detection
-    const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
-    console.log(`Resolved target branch: ${resolvedTargetBranch}`);
-    console.log(`Source branch: ${sourceBranch}`);
-
-    // Format for git log: targetBranch..sourceBranch (shows commits in source but not in target)
-    const compareSpec = `${resolvedTargetBranch}..${sourceBranch}`;
-    gitLogCommand.push(compareSpec, "--", ".");
-
-    console.log(`Git command: ${gitLogCommand.join(" ")}`);
-
-    // Use larger buffer for diff operations, smaller for commit messages only
-    const bufferSize = includeDiffs ? 20 * 1024 * 1024 : 5 * 1024 * 1024; // 20MB for diffs, 5MB for messages
-
-    try {
-      // Execute git command in workspace root
-      const { stdout } = await this.executeInWorkspaceRoot(
-        gitLogCommand.join(" "),
-        { maxBuffer: bufferSize }
-      );
-      return stdout.trim();
-    } catch (error) {
-      // Log more detailed error information
-      console.error(`Git error details: ${error}`);
-      throw new Error(`Failed to get commit messages: ${error}`);
-    }
-  }
 
   /**
    * Resolve the target branch to use for comparison
@@ -562,6 +520,86 @@ export class GitHelper {
   }
 
   /**
+   * Get a consolidated diff between two branches (HEAD comparison)
+   * This shows the total changes between the branches, not individual commit diffs
+   */
+  static async getBranchDiff(
+    sourceBranch: string,
+    targetBranch: string,
+    options: { maxSize?: number } = {}
+  ): Promise<string> {
+    try {
+      // Resolve the target branch to handle remote/local variations
+      const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+      
+      console.log(`Getting branch diff: ${resolvedTargetBranch}...${sourceBranch}`);
+      
+      // Use three-dot notation to get diff from merge-base to source branch
+      // This shows what would be merged, excluding changes already in target
+      const diffCommand = [
+        "git",
+        "diff",
+        `${resolvedTargetBranch}...${sourceBranch}`,
+        "--unified=3", // Limit context lines
+        "--stat", // Include file statistics at the end
+      ].join(" ");
+      
+      // Use larger buffer for diff operations
+      const maxBuffer = options.maxSize || 50 * 1024 * 1024; // 50MB default
+      
+      const { stdout } = await this.executeInWorkspaceRoot(diffCommand, {
+        maxBuffer,
+        timeout: 60000, // 60 seconds for large diffs
+      });
+      
+      // If diff is too large, get just the stats
+      if (stdout.length > maxBuffer * 0.9) {
+        console.warn("Diff too large, falling back to stats only");
+        return await this.getBranchDiffStats(sourceBranch, resolvedTargetBranch);
+      }
+      
+      return stdout.trim() || "No changes detected between branches.";
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // If buffer overflow, try to get just stats
+      if (errorMessage.includes("maxBuffer") || errorMessage.includes("MAXBUFFER")) {
+        console.warn("Diff exceeded buffer limit, getting stats only");
+        try {
+          return await this.getBranchDiffStats(sourceBranch, targetBranch);
+        } catch (statsError) {
+          console.error("Failed to get even stats:", statsError);
+          return "Diff too large to display. Please check the changes manually.";
+        }
+      }
+      
+      console.error(`Failed to get branch diff: ${error}`);
+      throw new Error(`Failed to get branch diff: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Get just the statistics of changes between branches (for large diffs)
+   */
+  private static async getBranchDiffStats(
+    sourceBranch: string, 
+    targetBranch: string
+  ): Promise<string> {
+    const resolvedTargetBranch = await this.resolveTargetBranch(targetBranch);
+    
+    const statsCommand = `git diff ${resolvedTargetBranch}...${sourceBranch} --stat`;
+    
+    const { stdout } = await this.executeInWorkspaceRoot(statsCommand, {
+      maxBuffer: 5 * 1024 * 1024, // 5MB should be enough for stats
+    });
+    
+    const header = `Branch comparison: ${sourceBranch} <- ${resolvedTargetBranch}\n`;
+    const note = "\n\n[Note: Full diff was too large. Showing file statistics only.]\n\n";
+    
+    return header + note + stdout.trim();
+  }
+
+  /**
    * Push a branch to the remote repository
    */
   static async pushBranch(
@@ -604,7 +642,7 @@ export class GitHelper {
 
       // Attempt to push the branch
       // Use --set-upstream in case this is the first push
-      const { stdout, stderr } = await this.executeInWorkspaceRoot(
+      const { stderr } = await this.executeInWorkspaceRoot(
         `git push --set-upstream origin ${branchName}`
       );
 
