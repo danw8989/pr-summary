@@ -1,24 +1,10 @@
 import * as vscode from "vscode";
 
-export class PrSummaryResultProvider
-  implements vscode.TextDocumentContentProvider
-{
-  private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
-  private _summaries = new Map<string, string>();
-
-  readonly onDidChange = this._onDidChange.event;
-
-  provideTextDocumentContent(uri: vscode.Uri): string {
-    const key = uri.path;
-    return this._summaries.get(key) || "Summary not found";
-  }
-
+/**
+ * Utility class for displaying PR summary results
+ */
+export class PrSummaryResultProvider {
   static async showSummary(summary: string, metadata?: any): Promise<void> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = metadata?.branch
-      ? `PR-Summary-${metadata.branch}-${timestamp}.md`
-      : `PR-Summary-${timestamp}.md`;
-
     // Create a new untitled document with markdown content
     const content = this.formatSummaryAsMarkdown(summary, metadata);
     const document = await vscode.workspace.openTextDocument({

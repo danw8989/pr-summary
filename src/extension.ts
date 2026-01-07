@@ -3,8 +3,6 @@
 import * as vscode from "vscode";
 import { PrSummaryTreeProvider } from "./ui/prSummaryTreeProvider";
 import { PrSummaryCommands } from "./ui/prSummaryCommands";
-import { JiraTicketSelector } from "./ui/jiraTicketSelector";
-import { PRSummaryHistoryProvider } from "./ui/viewProviders";
 
 function registerTreeView(
   context: vscode.ExtensionContext
@@ -23,8 +21,7 @@ function registerTreeView(
 
 function registerCommands(
   context: vscode.ExtensionContext,
-  treeProvider: PrSummaryTreeProvider,
-  jiraTicketSelector: JiraTicketSelector
+  treeProvider: PrSummaryTreeProvider
 ) {
   const commandsHandler = new PrSummaryCommands(context, treeProvider);
 
@@ -135,14 +132,11 @@ function registerStatusBarItem(context: vscode.ExtensionContext) {
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  // Create instances of components
-  const jiraTicketSelector = new JiraTicketSelector(context);
-
   // Register the new tree view
   const treeProvider = registerTreeView(context);
 
   // Register commands that work with the tree view
-  registerCommands(context, treeProvider, jiraTicketSelector);
+  registerCommands(context, treeProvider);
 
   // Keep the status bar item for quick access
   registerStatusBarItem(context);

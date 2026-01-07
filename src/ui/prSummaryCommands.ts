@@ -27,6 +27,12 @@ export class PrSummaryCommands {
   private _selectedJiraTicket?: string;
   private _selectedTemplate?: string;
 
+  // Fetch version counter to handle race conditions in commit preview
+  private _fetchVersion = 0;
+
+  // Debounce timer for selection updates
+  private _selectionDebounceTimer?: ReturnType<typeof setTimeout>;
+
   constructor(
     context: vscode.ExtensionContext,
     treeProvider: PrSummaryTreeProvider
@@ -46,6 +52,15 @@ export class PrSummaryCommands {
     this._templateManager = new TemplateManager();
     this._historyManager = new HistoryManager(context);
     this._autoPostService = new AutoPostService();
+
+    // Listen for configuration changes
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("prSummary")) {
+          this._treeProvider.refresh();
+        }
+      })
+    );
 
     // Set intelligent default target branch
     this.setDefaultTargetBranch();
@@ -1423,7 +1438,7 @@ To import these templates:
 
       // Get the most recent summary (index 0 should be the newest)
       const lastSummary = recentHistory[0];
-      title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
+      title = `${this._selectedBranch!} → ${this._selectedTargetBranch!}`;
       summary = lastSummary.summary;
 
       // Show confirmation of what will be used
@@ -1476,7 +1491,7 @@ To import these templates:
       }
 
       const newSummary = recentHistory[0];
-      title = `${this._selectedBranch} → ${this._selectedTargetBranch}`;
+      title = `${this._selectedBranch!} → ${this._selectedTargetBranch!}`;
       summary = newSummary.summary;
     } else {
       // Custom title and description
@@ -1595,11 +1610,15 @@ To import these templates:
 
   /**
    * Fetch commit preview data (called internally by tree provider)
+   * Uses version counter to prevent race conditions from rapid branch switching
    */
   async fetchCommitPreview(
     sourceBranch: string,
     targetBranch: string
   ): Promise<void> {
+    // Increment version to invalidate any in-flight requests
+    const currentVersion = ++this._fetchVersion;
+
     try {
       // Get commits without diffs for preview (faster and smaller)
       const commitMessages = await GitHelper.getCommitMessagesWithDiff(
@@ -1609,16 +1628,22 @@ To import these templates:
         10 // limit to 10 commits for preview
       );
 
-      this._treeProvider.updateCommitData(
-        commitMessages,
-        sourceBranch,
-        targetBranch
-      );
+      // Only update if this is still the latest request (prevents race condition)
+      if (currentVersion === this._fetchVersion) {
+        this._treeProvider.updateCommitData(
+          commitMessages,
+          sourceBranch,
+          targetBranch
+        );
+      }
     } catch (error) {
-      console.error("Error fetching commit preview:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      this._treeProvider.showCommitPreviewError(errorMessage);
+      // Only show error if this is still the latest request
+      if (currentVersion === this._fetchVersion) {
+        console.error("Error fetching commit preview:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this._treeProvider.showCommitPreviewError(errorMessage);
+      }
     }
   }
 
@@ -1682,16 +1707,13 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
         config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
 
       if (!apiKey) {
-        vscode.window
-          .showWarningMessage(
-            "OpenAI API Key not configured. Please configure it first.",
-            "Configure API Key"
-          )
-          .then((selection) => {
-            if (selection === "Configure API Key") {
-              this.configureApiKey();
-            }
-          });
+        const selection = await vscode.window.showWarningMessage(
+          "OpenAI API Key not configured. Please configure it first.",
+          "Configure API Key"
+        );
+        if (selection === "Configure API Key") {
+          await this.configureApiKey();
+        }
         return;
       }
 
@@ -1714,21 +1736,18 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
               increment: 100,
               message: "Models updated successfully!",
             });
-            vscode.window
-              .showInformationMessage(
-                `✅ Found ${
-                  result.models.length
-                } available models: ${result.models.slice(0, 3).join(", ")}${
-                  result.models.length > 3 ? "..." : ""
-                }`,
-                "View Settings"
-              )
-              .then((selection) => {
-                if (selection === "View Settings") {
-                  vscode.commands.executeCommand("prSummary.openSettings");
-                }
-              });
             this._treeProvider.refresh();
+            const selection = await vscode.window.showInformationMessage(
+              `✅ Found ${
+                result.models.length
+              } available models: ${result.models.slice(0, 3).join(", ")}${
+                result.models.length > 3 ? "..." : ""
+              }`,
+              "View Settings"
+            );
+            if (selection === "View Settings") {
+              await vscode.commands.executeCommand("prSummary.openSettings");
+            }
           } else {
             throw new Error(result.error || "Failed to update models");
           }
@@ -1750,16 +1769,13 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
         config.get<string>("openaiApiKey") || process.env.OPENAI_API_KEY;
 
       if (!apiKey) {
-        vscode.window
-          .showWarningMessage(
-            "OpenAI API Key not configured. Please configure it first.",
-            "Configure API Key"
-          )
-          .then((selection) => {
-            if (selection === "Configure API Key") {
-              this.configureApiKey();
-            }
-          });
+        const selection = await vscode.window.showWarningMessage(
+          "OpenAI API Key not configured. Please configure it first.",
+          "Configure API Key"
+        );
+        if (selection === "Configure API Key") {
+          await this.configureApiKey();
+        }
         return;
       }
 
@@ -1785,16 +1801,13 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
           });
 
           if (availableModels.length === 0) {
-            vscode.window
-              .showWarningMessage(
-                "No models available. Try refreshing the models list first.",
-                "Refresh Models"
-              )
-              .then((selection) => {
-                if (selection === "Refresh Models") {
-                  this.refreshAvailableModels();
-                }
-              });
+            const selection = await vscode.window.showWarningMessage(
+              "No models available. Try refreshing the models list first.",
+              "Refresh Models"
+            );
+            if (selection === "Refresh Models") {
+              await this.refreshAvailableModels();
+            }
             return;
           }
 
@@ -1811,24 +1824,20 @@ ${commitMessagesWithDiff || "No commits found between these branches"}
             description: this.getModelDescription(model),
           }));
 
-          quickPick.onDidChangeSelection((selection) => {
+          quickPick.onDidChangeSelection(async (selection) => {
             if (selection[0]) {
               const selectedModel = selection[0].label;
-
-              config
-                .update(
-                  "defaultModel",
-                  selectedModel,
-                  vscode.ConfigurationTarget.Global
-                )
-                .then(() => {
-                  vscode.window.showInformationMessage(
-                    `✅ Default model set to: ${selectedModel}`
-                  );
-                  this._treeProvider.refresh();
-                });
-
               quickPick.hide();
+
+              await config.update(
+                "defaultModel",
+                selectedModel,
+                vscode.ConfigurationTarget.Global
+              );
+              vscode.window.showInformationMessage(
+                `✅ Default model set to: ${selectedModel}`
+              );
+              this._treeProvider.refresh();
             }
           });
 

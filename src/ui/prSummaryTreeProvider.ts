@@ -30,7 +30,6 @@ export class PrSummaryTreeProvider
     this._context = context;
     this.initializeTree();
     this.loadCustomTemplates();
-    this.initializeDefaultBranches();
   }
 
   refresh(): void {
@@ -559,8 +558,8 @@ export class PrSummaryTreeProvider
             title: "Show Template Info",
           },
         },
-        ...templates.map((template, index) => ({
-          id: `customTemplate-${index}`,
+        ...templates.map((template) => ({
+          id: `customTemplate-${encodeURIComponent(template.name)}`,
           label: template.name,
           description: "Custom",
           iconPath: new vscode.ThemeIcon("file-text"),
@@ -576,17 +575,6 @@ export class PrSummaryTreeProvider
     this._onDidChangeTreeData.fire();
   }
 
-  /**
-   * Initialize default branch selections
-   */
-  private async initializeDefaultBranches(): Promise<void> {
-    try {
-      // This will be called by the commands handler when needed
-      // to avoid circular dependencies
-    } catch (error) {
-      console.log("Could not initialize default branches:", error);
-    }
-  }
 
   /**
    * Update branch selections with defaults
@@ -676,6 +664,7 @@ export class PrSummaryTreeProvider
         },
         refreshButton,
       ];
+      this._onDidChangeTreeData.fire();
     } else {
       // Show loading state
       commitPreviewSection.children = [
@@ -698,8 +687,6 @@ export class PrSummaryTreeProvider
         targetBranch
       );
     }
-
-    this._onDidChangeTreeData.fire();
   }
 
   /**
